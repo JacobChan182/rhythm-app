@@ -14,12 +14,17 @@ import {
 } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { isUsernameAvailable, reserveUsernameAndSaveProfile } from "@/lib/userProgress";
+import { createUserWithEmailAndPassword, updateProfile, signOut } from "firebase/auth";
 
 const MIN_PASSWORD_LENGTH = 8;
+const USERNAME_MIN = 2;
+const USERNAME_MAX = 20;
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
 export default function SignUp() {
   const { user } = useAuth();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -51,6 +56,10 @@ export default function SignUp() {
   }, [fade, slide]);
 
   function validate(): string | null {
+    const nameTrimmed = username.trim();
+    if (!nameTrimmed) return "Choose a username";
+    if (nameTrimmed.length < USERNAME_MIN || nameTrimmed.length > USERNAME_MAX) return `Username must be ${USERNAME_MIN}-${USERNAME_MAX} characters`;
+    if (!USERNAME_REGEX.test(nameTrimmed)) return "Username can only use letters, numbers, and underscores";
     const trimmed = email.trim();
     if (!trimmed) return "Enter your email";
     if (!trimmed.includes("@") || !trimmed.includes(".")) return "Enter a valid email address";
@@ -69,13 +78,26 @@ export default function SignUp() {
       return;
     }
     setLoading(true);
+    const nameTrimmed = username.trim();
+    let authUserCreated = false;
     try {
+      const available = await isUsernameAvailable(nameTrimmed);
+      if (!available) {
+        setError("Username taken");
+        return;
+      }
       const auth = getFirebaseAuth();
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      authUserCreated = true;
+      await updateProfile(cred.user, { displayName: nameTrimmed });
+      await reserveUsernameAndSaveProfile(cred.user, { username: nameTrimmed, email: email.trim() });
       router.replace("/(tabs)/home");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Sign up failed";
       setError(msg);
+      if (authUserCreated) {
+        await signOut(getFirebaseAuth());
+      }
     } finally {
       setLoading(false);
     }
@@ -108,6 +130,16 @@ export default function SignUp() {
 
           <TextInput
             style={[styles.input, error ? styles.inputError : null]}
+            placeholder={`Username (${USERNAME_MIN}-${USERNAME_MAX} characters)`}
+            placeholderTextColor="#52525b"
+            value={username}
+            onChangeText={(t) => { setUsername(t); setError(""); }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+          />
+          <TextInput
+            style={[styles.input, error && error !== "Username taken" ? styles.inputError : null]}
             placeholder="Email"
             placeholderTextColor="#52525b"
             value={email}

@@ -6,9 +6,9 @@ import {
   orderBy,
   limit,
   getDocs,
-  getFirebaseDb,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
+import { getFirebaseDb } from "@/lib/firebase";
 
 const SESSIONS_COLLECTION = "sessions";
 

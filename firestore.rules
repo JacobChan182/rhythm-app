@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users: each user can read/write only their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Usernames: read allowed without auth (check runs before sign-up); only create with own userId
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+    // Sessions: user can create with their userId; read/update/delete only their own
+    match /sessions/{sessionId} {
+      allow read, write: if request.auth != null && (
+        resource == null
+          ? request.resource.data.userId == request.auth.uid
+          : resource.data.userId == request.auth.uid
+      );
+    }
+  }
+}
