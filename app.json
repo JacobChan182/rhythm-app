@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Rhythm",
+    "slug": "rhythm-app",
+    "version": "1.0.0",
+    "scheme": "rhythm",
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"]
+  }
+}
