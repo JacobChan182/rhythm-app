@@ -11,7 +11,7 @@ Expo React Native (TypeScript), Firebase Auth + Firestore, web-first. Simple met
 
 2. **Firebase**
    - Create a project at [Firebase Console](https://console.firebase.google.com).
-   - Enable **Authentication** → **Anonymous** sign-in.
+   - Enable **Authentication** → **Anonymous** (for “Continue as guest”) and **Email/Password** (for sign-in and sign-up).
    - Create a **Firestore** database (test mode is fine for MVP).
    - Project settings → General → Your apps → Add web app → copy the config.
 

@@ -1,6 +1,21 @@
-import { Tabs } from "expo-router";
+import { useEffect } from "react";
+import { Tabs, router } from "expo-router";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TabsLayout() {
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace("/");
+    }
+  }, [user, loading]);
+
+  if (!loading && !user) {
+    return null;
+  }
+
   return (
     <Tabs
       screenOptions={{
