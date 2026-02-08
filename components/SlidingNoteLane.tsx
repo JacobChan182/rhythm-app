@@ -1,16 +1,18 @@
-import { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { View, Text, StyleSheet, Animated } from "react-native";
 import { getAudioContextTime } from "@/lib/metronome";
 import type { PatternCell } from "@/types/rudiment";
 
 /** How many seconds before a note's hit time it enters the track (from the right). */
-const APPROACH_SEC = 2;
+const APPROACH_SEC = 5;
+/** How often we update which notes are in the visible window (ms). Reduces mount churn. */
+const VISIBILITY_UPDATE_MS = 250;
 
 type SlidingNoteLaneProps = {
   expectedTimes: number[];
   pattern: PatternCell[];
   bpm: number;
-  /** Lane width in logical units; bar positions are 0 = hit zone (left), 1 = entry (right). */
+  /** Optional fixed width; if omitted, lane fills container and uses onLayout to measure. */
   laneWidth?: number;
 };
 
@@ -47,19 +49,32 @@ export function SlidingNoteLane({
   expectedTimes,
   pattern,
   bpm,
-  laneWidth = 720,
+  laneWidth: laneWidthProp,
 }: SlidingNoteLaneProps) {
-  const notes = buildNotes(expectedTimes, pattern);
-  const [now, setNow] = useState(0);
+  const notes = useMemo(() => buildNotes(expectedTimes, pattern), [expectedTimes, pattern]);
+  const nowVal = useRef(new Animated.Value(0)).current;
+  const nowRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  const visibilityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  /** Throttled "now" used only to pick which notes to mount. Positions are driven by nowVal. */
+  const [visibleWindowStart, setVisibleWindowStart] = useState(0);
+  /** Measured width when no laneWidth prop; spans container (e.g. L–R button row). */
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+
+  const laneWidth = laneWidthProp ?? measuredWidth;
 
   useEffect(() => {
     mountedRef.current = true;
+    const t0 = getAudioContextTime();
+    nowRef.current = t0;
+    nowVal.setValue(t0);
+    setVisibleWindowStart(t0 - 1);
     const tick = () => {
       if (!mountedRef.current) return;
       const t = getAudioContextTime();
-      setNow(t);
+      nowRef.current = t;
+      nowVal.setValue(t);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -67,41 +82,70 @@ export function SlidingNoteLane({
       mountedRef.current = false;
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
+  }, [nowVal]);
+
+  useEffect(() => {
+    const updateVisibility = () => {
+      if (!mountedRef.current) return;
+      const t = nowRef.current;
+      setVisibleWindowStart(t - 1);
+    };
+    updateVisibility();
+    visibilityIntervalRef.current = setInterval(updateVisibility, VISIBILITY_UPDATE_MS);
+    return () => {
+      if (visibilityIntervalRef.current != null) {
+        clearInterval(visibilityIntervalRef.current);
+        visibilityIntervalRef.current = null;
+      }
+    };
   }, []);
 
   if (notes.length === 0) return null;
+  if (laneWidth <= 0) {
+    return (
+      <View
+        style={[styles.wrapper, styles.wrapperFullWidth]}
+        onLayout={(e) => setMeasuredWidth(e.nativeEvent.layout.width)}
+      />
+    );
+  }
 
-  const hitZoneX = 0.2 * laneWidth; // hit zone at 20% from left
-  const startX = laneWidth; // bars enter from the right
+  const hitZoneX = 0.2 * laneWidth;
+  const startX = laneWidth;
+
+  const visibleNotes = notes.filter(
+    (note) =>
+      note.time >= visibleWindowStart - 0.5 &&
+      note.time <= visibleWindowStart + APPROACH_SEC + 2
+  );
 
   return (
-    <View style={[styles.wrapper, { width: laneWidth }]}>
+    <View
+      style={[styles.wrapper, laneWidthProp != null ? { width: laneWidth } : styles.wrapperFullWidth]}
+      onLayout={laneWidthProp == null ? (e) => setMeasuredWidth(e.nativeEvent.layout.width) : undefined}
+    >
       <View style={styles.track}>
-        {/* Hit zone line */}
         <View style={[styles.hitZone, { left: hitZoneX }]} />
-        {/* Sliding bars */}
-        {notes.map((note, i) => {
-          const elapsed = now - (note.time - APPROACH_SEC);
-          const progress = elapsed / APPROACH_SEC;
-          // 0 = at entry (right), 1 = at hit zone (left)
-          const x =
-            progress <= 0
-              ? startX + BAR_WRAPPER_WIDTH
-              : progress >= 1
-                ? hitZoneX - BAR_WRAPPER_WIDTH
-                : startX - progress * (startX - hitZoneX);
-          const visible = progress > -0.2 && progress < 1.4;
-          if (!visible) return null;
+        {visibleNotes.map((note) => {
+          const tMin = note.time - APPROACH_SEC;
+          const tHit = note.time;
+          const leftAnim = nowVal.interpolate({
+            inputRange: [tMin, tHit],
+            outputRange: [
+              Math.max(0, startX - BAR_WRAPPER_WIDTH / 2),
+              Math.max(0, hitZoneX - BAR_WRAPPER_WIDTH / 2),
+            ],
+            extrapolate: "clamp",
+          });
+          const opacityAnim = nowVal.interpolate({
+            inputRange: [tHit - 0.05, tHit, tHit + 0.15],
+            outputRange: [1, 1, 0.4],
+            extrapolate: "clamp",
+          });
           return (
-            <View
-              key={`${note.time}-${i}`}
-              style={[
-                styles.barWrapper,
-                {
-                  left: Math.max(0, x - BAR_WRAPPER_WIDTH / 2),
-                  opacity: progress > 1 ? 0.4 : 1,
-                },
-              ]}
+            <Animated.View
+              key={note.time}
+              style={[styles.barWrapper, { left: leftAnim, opacity: opacityAnim }]}
             >
               <View
                 style={[
@@ -110,7 +154,7 @@ export function SlidingNoteLane({
                 ]}
               />
               <Text style={styles.handLabel}>{note.hand}</Text>
-            </View>
+            </Animated.View>
           );
         })}
       </View>
@@ -122,6 +166,9 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 20,
     height: 140,
+  },
+  wrapperFullWidth: {
+    width: "100%",
   },
   track: {
     flex: 1,
