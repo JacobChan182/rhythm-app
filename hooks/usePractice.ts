@@ -281,6 +281,8 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     running: metronome.running,
     bpmInput,
     bpm: metronome.bpm,
+    sound: metronome.sound,
+    onSoundChange: metronome.setSound,
     currentBeat: metronome.currentBeat,
     currentBeatInCycle,
     isWeb: metronome.isWeb,

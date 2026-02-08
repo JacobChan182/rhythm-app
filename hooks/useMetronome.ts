@@ -5,7 +5,12 @@ import {
   isWeb,
   setMetronomeBpm,
   getMetronomeBpm,
+  getMetronomeSound,
+  setMetronomeSound,
+  type MetronomeSoundId,
 } from "@/lib/metronome";
+
+export type { MetronomeSoundId };
 
 const MIN_BPM = 20;
 const MAX_BPM = 300;
@@ -22,6 +27,10 @@ export type UseMetronomeResult = {
   bpm: number;
   /** Set BPM; takes effect on next start or immediately if running. */
   setBpm: (value: number) => void;
+  /** Current metronome sound preset id. */
+  sound: MetronomeSoundId;
+  /** Set metronome sound; takes effect on next click. */
+  setSound: (id: MetronomeSoundId) => void;
   /** Whether the metronome is currently running. */
   running: boolean;
   /** Start the metronome. Call from a user gesture (e.g. button tap). */
@@ -44,6 +53,7 @@ export function useMetronome(
   const [bpm, setBpmState] = useState(() =>
     Math.max(MIN_BPM, Math.min(MAX_BPM, initialBpm))
   );
+  const [sound, setSoundState] = useState<MetronomeSoundId>(() => getMetronomeSound());
   const [currentBeat, setCurrentBeat] = useState(-1);
   const onBeatRef = useRef<(i: number) => void>(() => {});
   const optionsRef = useRef(options);
@@ -53,6 +63,11 @@ export function useMetronome(
     const clamped = Math.max(MIN_BPM, Math.min(MAX_BPM, value));
     setBpmState(clamped);
     setMetronomeBpm(clamped);
+  }, []);
+
+  const setSound = useCallback((id: MetronomeSoundId) => {
+    setSoundState(id);
+    setMetronomeSound(id);
   }, []);
 
   const start = useCallback(async () => {
@@ -78,6 +93,8 @@ export function useMetronome(
     isWeb: isWeb(),
     bpm,
     setBpm,
+    sound,
+    setSound,
     running,
     start,
     stop,

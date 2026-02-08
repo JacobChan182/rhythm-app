@@ -35,6 +35,8 @@ export default function Practice() {
       running={practice.running}
       bpmInput={practice.bpmInput}
       bpm={practice.bpm}
+      sound={practice.sound}
+      onSoundChange={practice.onSoundChange}
       currentBeat={practice.currentBeat}
       currentBeatInCycle={practice.currentBeatInCycle}
       isWeb={practice.isWeb}

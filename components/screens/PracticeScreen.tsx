@@ -1,6 +1,19 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  Platform,
+  Pressable,
+} from "react-native";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
+import type { MetronomeSoundId } from "@/lib/metronome";
+import { METRONOME_SOUND_PRESETS } from "@/lib/metronome";
 import { SlidingNoteLane } from "@/components/SlidingNoteLane";
 import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 
@@ -10,6 +23,8 @@ type PracticeScreenProps = {
   running: boolean;
   bpmInput: string;
   bpm: number;
+  sound: MetronomeSoundId;
+  onSoundChange: (id: MetronomeSoundId) => void;
   currentBeat: number;
   /** Beat within current loop (0-3) when exercising; -1 otherwise. Use for beat display during exercise so it resets each loop. */
   currentBeatInCycle: number;
@@ -36,6 +51,8 @@ export function PracticeScreen({
   running,
   bpmInput,
   bpm,
+  sound,
+  onSoundChange,
   currentBeat,
   currentBeatInCycle,
   isWeb,
@@ -53,9 +70,12 @@ export function PracticeScreen({
   liveResults,
   counts,
 }: PracticeScreenProps) {
+  const [soundDropdownOpen, setSoundDropdownOpen] = useState(false);
   const showCountIn = phase === "count-in";
   const showLane = phase === "exercising" || phase === "summary";
   const showSummary = phase === "summary";
+
+  const currentPreset = METRONOME_SOUND_PRESETS.find((p) => p.id === sound) ?? METRONOME_SOUND_PRESETS[0];
 
   return (
     <View style={styles.container}>
@@ -195,6 +215,85 @@ export function PracticeScreen({
           );
         })}
       </View>
+
+      {isWeb && (
+        <View style={styles.soundRow}>
+          <Text style={styles.soundLabel}>Sound</Text>
+          {Platform.OS === "web" ? (
+            <select
+              value={sound}
+              onChange={(e) => onSoundChange(e.target.value as MetronomeSoundId)}
+              disabled={running}
+              style={{
+                minWidth: 180,
+                padding: "10px 12px",
+                borderRadius: 8,
+                backgroundColor: "#1a1a1a",
+                color: "#fff",
+                fontSize: 16,
+                border: "none",
+              }}
+            >
+              {METRONOME_SOUND_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.soundDropdownTrigger}
+                onPress={() => !running && setSoundDropdownOpen(true)}
+                disabled={running}
+              >
+                <Text style={styles.soundDropdownTriggerText} numberOfLines={1}>
+                  {currentPreset.label}
+                </Text>
+                <Text style={styles.soundDropdownChevron}>▼</Text>
+              </TouchableOpacity>
+              <Modal
+                visible={soundDropdownOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSoundDropdownOpen(false)}
+              >
+                <Pressable
+                  style={styles.soundDropdownBackdrop}
+                  onPress={() => setSoundDropdownOpen(false)}
+                >
+                  <View style={styles.soundDropdownList}>
+                    <ScrollView style={styles.soundDropdownScroll}>
+                      {METRONOME_SOUND_PRESETS.map((preset) => (
+                        <TouchableOpacity
+                          key={preset.id}
+                          style={[
+                            styles.soundDropdownOption,
+                            sound === preset.id && styles.soundDropdownOptionActive,
+                          ]}
+                          onPress={() => {
+                            onSoundChange(preset.id);
+                            setSoundDropdownOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.soundDropdownOptionText,
+                              sound === preset.id && styles.soundDropdownOptionTextActive,
+                            ]}
+                          >
+                            {preset.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </Pressable>
+              </Modal>
+            </>
+          )}
+        </View>
+      )}
 
       <View style={styles.controls}>
         <Text style={styles.label}>BPM</Text>
@@ -415,6 +514,66 @@ const styles = StyleSheet.create({
   },
   beatLabelActive: {
     color: "#000",
+  },
+  soundRow: {
+    marginBottom: 16,
+  },
+  soundLabel: {
+    color: "#888",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  soundDropdownTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minWidth: 180,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#1a1a1a",
+    borderWidth: 0,
+  },
+  soundDropdownTriggerText: {
+    fontSize: 16,
+    color: "#fff",
+    flex: 1,
+  },
+  soundDropdownChevron: {
+    fontSize: 10,
+    color: "#888",
+    marginLeft: 8,
+  },
+  soundDropdownBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  soundDropdownList: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    maxHeight: 320,
+    minWidth: 240,
+  },
+  soundDropdownScroll: {
+    maxHeight: 320,
+  },
+  soundDropdownOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  soundDropdownOptionActive: {
+    backgroundColor: "#22c55e",
+  },
+  soundDropdownOptionText: {
+    fontSize: 16,
+    color: "#fff",
+  },
+  soundDropdownOptionTextActive: {
+    color: "#000",
+    fontWeight: "600",
   },
   controls: {
     flexDirection: "row",
