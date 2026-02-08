@@ -1,12 +1,14 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
+import { SlidingNoteLane } from "@/components/SlidingNoteLane";
 
 type PracticeScreenProps = {
   phase: "idle" | "count-in" | "exercising" | "summary";
   countInBeatsSeen: number;
   running: boolean;
   bpmInput: string;
+  bpm: number;
   currentBeat: number;
   isWeb: boolean;
   onBpmChange: (text: string) => void;
@@ -14,9 +16,11 @@ type PracticeScreenProps = {
   onStopForSummary: () => void;
   dismissSummary: () => void;
   tapCount: number;
-  tapFlash: boolean;
-  onTap: () => void;
+  tapFlashHand: "L" | "R" | null;
+  onTapLeft: () => void;
+  onTapRight: () => void;
   rudiment: Rudiment | null;
+  expectedTimes: number[];
   liveResults: HitResult[];
   summaryResults: HitResult[] | null;
   counts: { perfect: number; good: number; miss: number } | null;
@@ -27,6 +31,7 @@ export function PracticeScreen({
   countInBeatsSeen,
   running,
   bpmInput,
+  bpm,
   currentBeat,
   isWeb,
   onBpmChange,
@@ -34,9 +39,11 @@ export function PracticeScreen({
   onStopForSummary,
   dismissSummary,
   tapCount,
-  tapFlash,
-  onTap,
+  tapFlashHand,
+  onTapLeft,
+  onTapRight,
   rudiment,
+  expectedTimes,
   liveResults,
   counts,
 }: PracticeScreenProps) {
@@ -115,14 +122,48 @@ export function PracticeScreen({
       )}
 
       {phase === "exercising" && (
-        <TouchableOpacity
-          style={[styles.tapArea, tapFlash && styles.tapAreaFlash]}
-          onPress={onTap}
-          activeOpacity={1}
-        >
-          <Text style={styles.tapLabel}>Tap</Text>
+        <>
+          {rudiment && expectedTimes.length > 0 && isWeb && (
+            <SlidingNoteLane
+              expectedTimes={expectedTimes}
+              pattern={rudiment.pattern}
+              bpm={bpm}
+            />
+          )}
+          <View style={styles.tapRow}>
+            <TouchableOpacity
+              style={[
+                styles.tapArea,
+                styles.tapAreaL,
+                tapFlashHand === "L" && styles.tapAreaFlashL,
+              ]}
+              onPress={onTapLeft}
+              activeOpacity={1}
+            >
+              <Text style={styles.tapLabel}>L</Text>
+              <Text style={styles.tapSubtext}>Left</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tapArea,
+                styles.tapAreaR,
+                tapFlashHand === "R" && styles.tapAreaFlashR,
+              ]}
+              onPress={onTapRight}
+              onContextMenu={(e) => {
+                const ev = (e as unknown as { nativeEvent?: { preventDefault?: () => void } })
+                  .nativeEvent;
+                if (ev?.preventDefault) ev.preventDefault();
+                onTapRight();
+              }}
+              activeOpacity={1}
+            >
+              <Text style={styles.tapLabel}>R</Text>
+              <Text style={styles.tapSubtext}>Right</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.tapCount}>{tapCount} taps</Text>
-        </TouchableOpacity>
+        </>
       )}
 
       <View style={styles.beatRow}>
@@ -295,29 +336,47 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.8)",
     marginTop: 2,
   },
+  tapRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 8,
+  },
   tapArea: {
+    flex: 1,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
-    paddingVertical: 20,
+    paddingVertical: 24,
     paddingHorizontal: 24,
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "transparent",
   },
-  tapAreaFlash: {
-    backgroundColor: "#22c55e22",
-    borderColor: "#22c55e",
+  tapAreaL: {},
+  tapAreaR: {},
+  tapAreaFlashL: {
+    backgroundColor: "#3b82f622",
+    borderColor: "#3b82f6",
+  },
+  tapAreaFlashR: {
+    backgroundColor: "#ef444422",
+    borderColor: "#ef4444",
   },
   tapLabel: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 28,
+    fontWeight: "700",
     color: "#fff",
+  },
+  tapSubtext: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 4,
   },
   tapCount: {
     fontSize: 14,
     color: "#888",
-    marginTop: 4,
+    marginBottom: 24,
+    textAlign: "center",
   },
   beatRow: {
     flexDirection: "row",

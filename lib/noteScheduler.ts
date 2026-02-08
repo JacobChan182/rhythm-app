@@ -44,20 +44,41 @@ export function getExpectedHitTimes(
 }
 
 /**
- * Example: paradiddle at 80 BPM, eighth-note subdivision, 8 strokes.
- * One bar at 80 BPM = 60/80 = 0.75 s; eighth step = 0.75/2 = 0.375 s.
- * Hits at start, start+0.375, start+0.75, ... (8 times).
+ * Generate expected hit times for a pattern that may include rests ("").
+ * Only returns a time for each non-rest cell. Used for course rudiments (e.g. 32 sixteenths with some rests).
+ */
+export function getExpectedHitTimesFromPattern(
+  startTime: number,
+  bpm: number,
+  subdivision: Subdivision,
+  pattern: (string | null)[]
+): number[] {
+  const step = stepSeconds(bpm, subdivision);
+  const times: number[] = [];
+  for (let i = 0; i < pattern.length; i++) {
+    const cell = pattern[i];
+    if (cell === "L" || cell === "R") {
+      times.push(startTime + i * step);
+    }
+  }
+  return times;
+}
+
+/**
+ * Expected hit times for a rudiment. Uses session BPM (passed in), not rudiment.bpm.
+ * Supports patterns with rests (e.g. course rudiments with 32 cells, some "").
  */
 export function getExpectedHitTimesForRudiment(
   startTime: number,
-  rudiment: { bpm: number; subdivision: Subdivision; pattern: unknown[] }
+  bpm: number,
+  rudiment: { subdivision: Subdivision; pattern: unknown[] }
 ): number[] {
-  return getExpectedHitTimes(
-    startTime,
-    rudiment.bpm,
-    rudiment.subdivision,
-    rudiment.pattern.length
-  );
+  const pattern = rudiment.pattern as (string | null)[];
+  const hasRests = pattern.some((c) => c === "" || c == null);
+  if (hasRests) {
+    return getExpectedHitTimesFromPattern(startTime, bpm, rudiment.subdivision, pattern);
+  }
+  return getExpectedHitTimes(startTime, bpm, rudiment.subdivision, rudiment.pattern.length);
 }
 
 /*

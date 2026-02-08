@@ -4,10 +4,11 @@ import { useTapCapture } from "@/hooks/useTapCapture";
 import type { User } from "firebase/auth";
 import { getUserProgress, saveLastBpm, getDefaultBpm } from "@/lib/userProgress";
 import { getAudioContextTime } from "@/lib/metronome";
-import { getExpectedHitTimes } from "@/lib/noteScheduler";
+import { getExpectedHitTimesForRudiment } from "@/lib/noteScheduler";
 import { scoreSession, countByAccuracy, type HitResult } from "@/lib/scoring";
-import { getAllRudiments } from "@/lib/rudiments";
+import { getAllRudiments, getRudimentById } from "@/lib/rudiments";
 import { saveSession } from "@/lib/sessions";
+import type { Rudiment } from "@/types/rudiment";
 
 const MIN_BPM = 40;
 const MAX_BPM = 240;
@@ -15,8 +16,26 @@ const COUNT_IN_BEATS = 4;
 
 export type PracticePhase = "idle" | "count-in" | "exercising" | "summary";
 
-export function usePractice(user: User | null) {
-  const rudiment = getAllRudiments()[0] ?? null;
+export type UsePracticeOptions = {
+  /** Pre-resolved rudiment (e.g. from useResolvedRudiment). When set, rudimentId is ignored. */
+  rudiment?: Rudiment | null;
+  rudimentId?: string;
+  initialBpm?: number;
+};
+
+export function usePractice(user: User | null, options?: UsePracticeOptions) {
+  const rudimentFromOptions =
+    options?.rudiment !== undefined
+      ? options.rudiment
+      : options?.rudimentId != null
+        ? getRudimentById(options.rudimentId)
+        : undefined;
+  const rudiment = rudimentFromOptions ?? getAllRudiments()[0] ?? null;
+  const initialBpm =
+    options?.initialBpm != null
+      ? Math.min(MAX_BPM, Math.max(MIN_BPM, options.initialBpm))
+      : null;
+
   const [phase, setPhase] = useState<PracticePhase>("idle");
   const [countInBeatsSeen, setCountInBeatsSeen] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
@@ -28,23 +47,24 @@ export function usePractice(user: User | null) {
   const sessionStartTimeRef = useRef<number>(0);
   const exerciseStartTimeRef = useRef<number>(0);
 
-  const metronome = useMetronome(120, {
+  const defaultBpm = initialBpm ?? 120;
+  const metronome = useMetronome(defaultBpm, {
     onBeat: (beatIndex) => {
       onBeatRef.current?.(beatIndex);
     },
   });
   const tapCapture = useTapCapture();
-  const [bpmInput, setBpmInput] = useState("120");
-  const [progressLoaded, setProgressLoaded] = useState(false);
+  const [bpmInput, setBpmInput] = useState(String(defaultBpm));
+  const [progressLoaded, setProgressLoaded] = useState(initialBpm != null);
 
   useEffect(() => {
     if (!user || progressLoaded) return;
     let cancelled = false;
     getUserProgress(user).then((progress) => {
       if (cancelled) return;
-      const defaultBpm = getDefaultBpm(progress);
-      metronome.setBpm(defaultBpm);
-      setBpmInput(String(defaultBpm));
+      const bpm = getDefaultBpm(progress);
+      metronome.setBpm(bpm);
+      setBpmInput(String(bpm));
       setProgressLoaded(true);
     });
     return () => {
@@ -92,11 +112,10 @@ export function usePractice(user: User | null) {
           const start = sessionStartTimeRef.current;
           const exerciseStartTime = start + COUNT_IN_BEATS * (60 / metronome.bpm);
           exerciseStartTimeRef.current = exerciseStartTime;
-          const times = getExpectedHitTimes(
+          const times = getExpectedHitTimesForRudiment(
             exerciseStartTime,
             metronome.bpm,
-            rudiment.subdivision,
-            rudiment.pattern.length
+            rudiment
           );
           setExpectedTimes(times);
           setPhase("exercising");
@@ -165,6 +184,7 @@ export function usePractice(user: User | null) {
     countInBeatsSeen,
     running: metronome.running,
     bpmInput,
+    bpm: metronome.bpm,
     currentBeat: metronome.currentBeat,
     isWeb: metronome.isWeb,
     onBpmChange: handleBpmChange,
@@ -172,8 +192,9 @@ export function usePractice(user: User | null) {
     onStopForSummary: handleStopForSummary,
     dismissSummary,
     tapCount: tapCapture.tapCount,
-    tapFlash: tapCapture.tapFlash,
-    onTap: tapCapture.registerTap,
+    tapFlashHand: tapCapture.tapFlashHand,
+    onTapLeft: () => tapCapture.registerTap("L"),
+    onTapRight: () => tapCapture.registerTap("R"),
     rudiment,
     expectedTimes,
     liveResults,

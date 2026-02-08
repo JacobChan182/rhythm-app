@@ -58,6 +58,39 @@
 
 **Note:** A composite index on `sessions` (userId, createdAt) may be required. Firestore will log a link to create it when the query first runs.
 
+### `courses` (curriculum – one doc per course)
+
+- **Path:** `courses/{courseId}` (auto-ID)
+- **Fields:** `title` (string), `description` (string), `order` (number), `updatedAt` (ISO string).
+- Written by the curriculum-builder app; read by the rhythm app Learn tab.
+
+### `courses/{courseId}/rudiments` (rudiments defined per course)
+
+- **Path:** `courses/{courseId}/rudiments/{rudimentId}` (auto-ID)
+- **Fields:** `name` (string), `pattern` (array of 32 strings: `"L"` | `"R"` | `""` for rest, each cell = one 16th note), `order` (number), `updatedAt` (ISO string).
+- Admins add/edit these in the curriculum builder (32-box editor: left click = L, right click = R, click again = rest). Lessons can reference them via id `course:{courseId}:{rudimentId}`.
+
+### `lessons` (one doc per lesson in a course)
+
+- **Path:** `lessons/{lessonId}` (auto-ID)
+- **Fields:** `courseId` (string), `title` (string), `body` (string, markdown or plain), `order` (number), `rudimentIds` (array of strings — rudiment IDs for the student to learn, e.g. `["paradiddle-1"]`), `suggestedBpm` (optional number), `updatedAt` (ISO string).
+- Written by the curriculum-builder app; read by the rhythm app Learn tab. Legacy: if `rudimentIds` is missing, readers fall back to single `rudimentId` when present.
+
+### `admins` (optional – for curriculum write access)
+
+- **Path:** `admins/{userId}` (Firebase Auth UID)
+- **Fields:** `role` (string), e.g. `"admin"`. Create this doc in Console for users who may use the curriculum-builder app.
+- Security rules allow curriculum write only when `get(admins/request.auth.uid).data.role == 'admin'`.
+
+## Example queries (curriculum)
+
+- **List courses by order:** `collection('courses').orderBy('order').get()` → implemented in lib/curriculum.ts `getCourses()`.
+- **List lessons for a course:** `collection('lessons').where('courseId', '==', courseId).orderBy('order').get()` → `getLessonsByCourseId(courseId)`.
+
+**Note:** A composite index on `lessons` (courseId, order) is required for listing lessons by course. Either:
+- **Console:** When the query first runs, Firestore logs a link to create the index; open it and click Create.
+- **CLI:** From `rhythm-app`, run `firebase deploy --only firestore:indexes` (index is defined in `firestore.indexes.json`).
+
 ## Security rules (required for collections to work)
 
 The app needs Firestore rules that allow the sign-up and session flows. **If rules are missing or deny all, no collections will be created** (writes fail and you may see permission errors or "Username taken" on sign-up).
@@ -82,3 +115,13 @@ Use the rules in the project root: **`firestore.rules`**.
 2. **Rules deployed** – Rules tab shows the `match /users/...` (etc.) rules from `firestore.rules`, not the default "allow read, write: if false;" for everything.  
 3. **Correct project** – `.env` has `EXPO_PUBLIC_FIREBASE_PROJECT_ID` equal to the project you’re viewing in the console.  
 4. **Sign up again** – After fixing rules, sign up with a new account; that creates `users` and `usernames`. Doing a practice and tapping Stop creates `sessions`.
+
+### "Missing or insufficient permissions"
+
+1. **Redeploy rules** – The Console may still have old (e.g. deny-all) rules. From `rhythm-app`:  
+   `firebase use crash-course-19cb4` then `firebase deploy --only firestore:rules`.  
+   Or paste the contents of `firestore.rules` into Console → Firestore → Rules and click **Publish**.  
+2. **Same project** – Rhythm app `.env` and curriculum-builder `.env` must use the same Firebase project as the Console (e.g. `crash-course-19cb4`).  
+3. **Rhythm app – Learn tab** – Courses/lessons/rudiments are readable by anyone (`allow read: if true`). If you still see permission denied there, rules are not deployed or the app is using a different project.  
+4. **Rhythm app – Home / Progress** – Reading `users` or `sessions` requires the user to be **signed in**. Sign in (or sign up) and try again.  
+5. **Curriculum builder** – You must be **signed in**; the app reads `admins/{yourUid}` to check admin. Add your UID to `admins` with `role: "admin"` in the Console if you need write access.

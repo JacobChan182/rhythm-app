@@ -10,13 +10,18 @@ export type Subdivision = "quarter" | "eighth" | "sixteenth";
 export type Stroke = "R" | "L";
 
 /**
- * A rudiment or exercise: name, tempo, subdivision, and a R/L pattern.
- * Pattern length and subdivision together define the rhythm (e.g. 8 eighths = one bar of 4/4 at eighth subdivision).
+ * One cell in a pattern: L, R, or rest (empty string).
+ */
+export type PatternCell = Stroke | "";
+
+/**
+ * A rudiment or exercise: name, tempo, subdivision, and a pattern (L/R/rest).
+ * Pattern may include "" for rest (e.g. course rudiments with 32 sixteenths).
  */
 export interface Rudiment {
   id: string;
   name: string;
   bpm: number;
   subdivision: Subdivision;
-  pattern: Stroke[];
+  pattern: PatternCell[];
 }
