@@ -1,15 +1,4 @@
-import { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Modal,
-  Platform,
-  Pressable,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
 import type { MetronomeSoundId } from "@/lib/metronome";
@@ -70,12 +59,9 @@ export function PracticeScreen({
   liveResults,
   counts,
 }: PracticeScreenProps) {
-  const [soundDropdownOpen, setSoundDropdownOpen] = useState(false);
   const showCountIn = phase === "count-in";
   const showLane = phase === "exercising" || phase === "summary";
   const showSummary = phase === "summary";
-
-  const currentPreset = METRONOME_SOUND_PRESETS.find((p) => p.id === sound) ?? METRONOME_SOUND_PRESETS[0];
 
   return (
     <View style={styles.container}>
@@ -147,50 +133,50 @@ export function PracticeScreen({
         </View>
       )}
 
-      {phase === "exercising" && (
-        <>
-          {rudiment && expectedTimesExtended.length > 0 && isWeb && (
-            <SlidingNoteLane
-              expectedTimes={expectedTimesExtended}
-              pattern={rudiment.pattern}
-              bpm={bpm}
-            />
-          )}
-          <View style={styles.tapRow}>
-            <TouchableOpacity
-              style={[
-                styles.tapArea,
-                styles.tapAreaL,
-                tapFlashHand === "L" && styles.tapAreaFlashL,
-              ]}
-              onPress={onTapLeft}
-              activeOpacity={1}
-            >
-              <Text style={styles.tapLabel}>L</Text>
-              <Text style={styles.tapSubtext}>Left</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tapArea,
-                styles.tapAreaR,
-                tapFlashHand === "R" && styles.tapAreaFlashR,
-              ]}
-              onPress={onTapRight}
-              onContextMenu={(e) => {
-                const ev = (e as unknown as { nativeEvent?: { preventDefault?: () => void } })
-                  .nativeEvent;
-                if (ev?.preventDefault) ev.preventDefault();
-                onTapRight();
-              }}
-              activeOpacity={1}
-            >
-              <Text style={styles.tapLabel}>R</Text>
-              <Text style={styles.tapSubtext}>Right</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.tapCount}>{tapCount} taps</Text>
-        </>
-      )}
+      {phase === "exercising" &&
+        rudiment &&
+        expectedTimesExtended.length > 0 &&
+        isWeb && (
+          <SlidingNoteLane
+            expectedTimes={expectedTimesExtended}
+            pattern={rudiment.pattern}
+            bpm={bpm}
+          />
+        )}
+
+      <View style={styles.tapRow}>
+        <TouchableOpacity
+          style={[
+            styles.tapArea,
+            styles.tapAreaL,
+            tapFlashHand === "L" && styles.tapAreaFlashL,
+          ]}
+          onPress={onTapLeft}
+          activeOpacity={1}
+        >
+          <Text style={styles.tapLabel}>L</Text>
+          <Text style={styles.tapSubtext}>Left</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tapArea,
+            styles.tapAreaR,
+            tapFlashHand === "R" && styles.tapAreaFlashR,
+          ]}
+          onPress={onTapRight}
+          onContextMenu={(e) => {
+            const ev = (e as unknown as { nativeEvent?: { preventDefault?: () => void } })
+              .nativeEvent;
+            if (ev?.preventDefault) ev.preventDefault();
+            onTapRight();
+          }}
+          activeOpacity={1}
+        >
+          <Text style={styles.tapLabel}>R</Text>
+          <Text style={styles.tapSubtext}>Right</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.tapCount}>{tapCount} taps</Text>
 
       <View style={styles.beatRow}>
         {[0, 1, 2, 3].map((i) => {
@@ -219,79 +205,32 @@ export function PracticeScreen({
       {isWeb && (
         <View style={styles.soundRow}>
           <Text style={styles.soundLabel}>Sound</Text>
-          {Platform.OS === "web" ? (
-            <select
-              value={sound}
-              onChange={(e) => onSoundChange(e.target.value as MetronomeSoundId)}
-              disabled={running}
-              style={{
-                minWidth: 180,
-                padding: "10px 12px",
-                borderRadius: 8,
-                backgroundColor: "#1a1a1a",
-                color: "#fff",
-                fontSize: 16,
-                border: "none",
-              }}
-            >
-              {METRONOME_SOUND_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.soundScroll}
+          >
+            {METRONOME_SOUND_PRESETS.map((preset) => (
               <TouchableOpacity
-                style={styles.soundDropdownTrigger}
-                onPress={() => !running && setSoundDropdownOpen(true)}
+                key={preset.id}
+                style={[
+                  styles.soundChip,
+                  sound === preset.id && styles.soundChipActive,
+                ]}
+                onPress={() => onSoundChange(preset.id)}
                 disabled={running}
               >
-                <Text style={styles.soundDropdownTriggerText} numberOfLines={1}>
-                  {currentPreset.label}
-                </Text>
-                <Text style={styles.soundDropdownChevron}>▼</Text>
-              </TouchableOpacity>
-              <Modal
-                visible={soundDropdownOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setSoundDropdownOpen(false)}
-              >
-                <Pressable
-                  style={styles.soundDropdownBackdrop}
-                  onPress={() => setSoundDropdownOpen(false)}
+                <Text
+                  style={[
+                    styles.soundChipText,
+                    sound === preset.id && styles.soundChipTextActive,
+                  ]}
                 >
-                  <View style={styles.soundDropdownList}>
-                    <ScrollView style={styles.soundDropdownScroll}>
-                      {METRONOME_SOUND_PRESETS.map((preset) => (
-                        <TouchableOpacity
-                          key={preset.id}
-                          style={[
-                            styles.soundDropdownOption,
-                            sound === preset.id && styles.soundDropdownOptionActive,
-                          ]}
-                          onPress={() => {
-                            onSoundChange(preset.id);
-                            setSoundDropdownOpen(false);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.soundDropdownOptionText,
-                              sound === preset.id && styles.soundDropdownOptionTextActive,
-                            ]}
-                          >
-                            {preset.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                </Pressable>
-              </Modal>
-            </>
-          )}
+                  {preset.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -523,57 +462,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
-  soundDropdownTrigger: {
+  soundScroll: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minWidth: 180,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: 8,
+  },
+  soundChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     backgroundColor: "#1a1a1a",
-    borderWidth: 0,
   },
-  soundDropdownTriggerText: {
-    fontSize: 16,
-    color: "#fff",
-    flex: 1,
-  },
-  soundDropdownChevron: {
-    fontSize: 10,
-    color: "#888",
-    marginLeft: 8,
-  },
-  soundDropdownBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  soundDropdownList: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    maxHeight: 320,
-    minWidth: 240,
-  },
-  soundDropdownScroll: {
-    maxHeight: 320,
-  },
-  soundDropdownOption: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  soundDropdownOptionActive: {
+  soundChipActive: {
     backgroundColor: "#22c55e",
   },
-  soundDropdownOptionText: {
-    fontSize: 16,
-    color: "#fff",
+  soundChipText: {
+    fontSize: 14,
+    color: "#888",
+    fontWeight: "500",
   },
-  soundDropdownOptionTextActive: {
+  soundChipTextActive: {
     color: "#000",
-    fontWeight: "600",
   },
   controls: {
     flexDirection: "row",

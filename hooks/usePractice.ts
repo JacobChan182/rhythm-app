@@ -196,7 +196,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
               exerciseStartTime,
               metronome.bpm,
               rudiment,
-              80
+              30
             )
           );
           setCurrentCycleIndex(0);
