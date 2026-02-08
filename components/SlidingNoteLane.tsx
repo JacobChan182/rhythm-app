@@ -17,17 +17,27 @@ type SlidingNoteLaneProps = {
 type Note = { time: number; hand: "L" | "R" };
 
 function buildNotes(expectedTimes: number[], pattern: PatternCell[]): Note[] {
-  const notes: Note[] = [];
-  let idx = 0;
-  for (const cell of pattern) {
-    if (cell === "L" || cell === "R") {
-      if (idx < expectedTimes.length) {
-        notes.push({ time: expectedTimes[idx], hand: cell });
-        idx++;
+  const handsPerCycle = pattern.filter(
+    (c): c is "L" | "R" => c === "L" || c === "R"
+  );
+  const notesPerCycle = handsPerCycle.length;
+  if (expectedTimes.length <= notesPerCycle) {
+    const notes: Note[] = [];
+    let idx = 0;
+    for (const cell of pattern) {
+      if (cell === "L" || cell === "R") {
+        if (idx < expectedTimes.length) {
+          notes.push({ time: expectedTimes[idx], hand: cell });
+          idx++;
+        }
       }
     }
+    return notes;
   }
-  return notes;
+  return expectedTimes.map((time, i) => ({
+    time,
+    hand: handsPerCycle[i % notesPerCycle],
+  }));
 }
 
 const BAR_WIDTH = 8;

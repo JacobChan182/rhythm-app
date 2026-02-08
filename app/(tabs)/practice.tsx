@@ -36,6 +36,7 @@ export default function Practice() {
       bpmInput={practice.bpmInput}
       bpm={practice.bpm}
       currentBeat={practice.currentBeat}
+      currentBeatInCycle={practice.currentBeatInCycle}
       isWeb={practice.isWeb}
       onBpmChange={practice.onBpmChange}
       onStartStop={practice.onStartStop}
@@ -47,6 +48,7 @@ export default function Practice() {
       onTapRight={practice.onTapRight}
       rudiment={practice.rudiment}
       expectedTimes={practice.expectedTimes}
+      expectedTimesExtended={practice.expectedTimesExtended}
       liveResults={practice.liveResults}
       summaryResults={practice.summaryResults}
       counts={practice.counts}

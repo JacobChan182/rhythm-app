@@ -14,9 +14,20 @@ const NOTES_PER_BEAT: Record<Subdivision, number> = {
  * Compute the time step in seconds for one note at the given BPM and subdivision.
  * Deterministic: step = (60 / bpm) / notesPerBeat.
  */
-function stepSeconds(bpm: number, subdivision: Subdivision): number {
+export function stepSeconds(bpm: number, subdivision: Subdivision): number {
   const beatDuration = 60 / bpm;
   return beatDuration / NOTES_PER_BEAT[subdivision];
+}
+
+/**
+ * Duration in seconds of one full pattern cycle (patternLength steps).
+ */
+export function getCycleDurationSeconds(
+  bpm: number,
+  subdivision: Subdivision,
+  patternLength: number
+): number {
+  return patternLength * stepSeconds(bpm, subdivision);
 }
 
 /**
@@ -79,6 +90,26 @@ export function getExpectedHitTimesForRudiment(
     return getExpectedHitTimesFromPattern(startTime, bpm, rudiment.subdivision, pattern);
   }
   return getExpectedHitTimes(startTime, bpm, rudiment.subdivision, rudiment.pattern.length);
+}
+
+/**
+ * Expected hit times for multiple consecutive cycles (for looping display).
+ */
+export function getExpectedHitTimesForRudimentCycles(
+  startTime: number,
+  bpm: number,
+  rudiment: { subdivision: Subdivision; pattern: unknown[] },
+  cycleCount: number
+): number[] {
+  const pattern = rudiment.pattern as (string | null)[];
+  const cycleDuration = getCycleDurationSeconds(bpm, rudiment.subdivision, pattern.length);
+  const out: number[] = [];
+  for (let c = 0; c < cycleCount; c++) {
+    const cycleStart = startTime + c * cycleDuration;
+    const times = getExpectedHitTimesForRudiment(cycleStart, bpm, rudiment);
+    out.push(...times);
+  }
+  return out;
 }
 
 /*

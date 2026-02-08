@@ -10,6 +10,8 @@ type PracticeScreenProps = {
   bpmInput: string;
   bpm: number;
   currentBeat: number;
+  /** Beat within current loop (0-3) when exercising; -1 otherwise. Use for beat display during exercise so it resets each loop. */
+  currentBeatInCycle: number;
   isWeb: boolean;
   onBpmChange: (text: string) => void;
   onStartStop: () => void;
@@ -21,6 +23,7 @@ type PracticeScreenProps = {
   onTapRight: () => void;
   rudiment: Rudiment | null;
   expectedTimes: number[];
+  expectedTimesExtended: number[];
   liveResults: HitResult[];
   summaryResults: HitResult[] | null;
   counts: { perfect: number; good: number; miss: number } | null;
@@ -33,6 +36,7 @@ export function PracticeScreen({
   bpmInput,
   bpm,
   currentBeat,
+  currentBeatInCycle,
   isWeb,
   onBpmChange,
   onStartStop,
@@ -44,6 +48,7 @@ export function PracticeScreen({
   onTapRight,
   rudiment,
   expectedTimes,
+  expectedTimesExtended,
   liveResults,
   counts,
 }: PracticeScreenProps) {
@@ -123,9 +128,9 @@ export function PracticeScreen({
 
       {phase === "exercising" && (
         <>
-          {rudiment && expectedTimes.length > 0 && isWeb && (
+          {rudiment && expectedTimesExtended.length > 0 && isWeb && (
             <SlidingNoteLane
-              expectedTimes={expectedTimes}
+              expectedTimes={expectedTimesExtended}
               pattern={rudiment.pattern}
               bpm={bpm}
             />
@@ -167,21 +172,27 @@ export function PracticeScreen({
       )}
 
       <View style={styles.beatRow}>
-        {[0, 1, 2, 3].map((i) => (
-          <View
-            key={i}
-            style={[styles.beatBox, currentBeat === i && styles.beatBoxActive]}
-          >
-            <Text
-              style={[
-                styles.beatLabel,
-                currentBeat === i && styles.beatLabelActive,
-              ]}
+        {[0, 1, 2, 3].map((i) => {
+          const beat =
+            phase === "exercising" && currentBeatInCycle >= 0
+              ? currentBeatInCycle
+              : currentBeat;
+          return (
+            <View
+              key={i}
+              style={[styles.beatBox, beat === i && styles.beatBoxActive]}
             >
-              {i + 1}
-            </Text>
-          </View>
-        ))}
+              <Text
+                style={[
+                  styles.beatLabel,
+                  beat === i && styles.beatLabelActive,
+                ]}
+              >
+                {i + 1}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
       <View style={styles.controls}>
