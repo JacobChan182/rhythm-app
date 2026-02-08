@@ -140,11 +140,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="account"
         options={{
-          title: "Progress",
+          title: "Account",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
