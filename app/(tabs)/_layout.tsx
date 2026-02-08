@@ -1,5 +1,7 @@
 import { useEffect } from "react";
+import { StyleSheet } from "react-native";
 import { Tabs, router } from "expo-router";
+import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -22,9 +24,31 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: "#22c55e",
         tabBarInactiveTintColor: "#666",
-        tabBarStyle: { backgroundColor: "#0f0f0f" },
-        headerStyle: { backgroundColor: "#0f0f0f" },
-        headerTintColor: "#fff",
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          position: "absolute",
+          left: 24,
+          right: 24,
+          top: 20,
+          height: 52,
+          borderRadius: 26,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          overflow: "hidden",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 10,
+          elevation: 12,
+        },
+        tabBarBackground: () => (
+          <BlurView
+            intensity={60}
+            tint="dark"
+            style={StyleSheet.absoluteFillObject}
+          />
+        ),
+        headerShown: false,
       }}
     >
       <Tabs.Screen

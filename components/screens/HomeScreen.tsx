@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 type HomeScreenProps = {
   onStartPractice: () => void;
@@ -8,27 +9,47 @@ type HomeScreenProps = {
 
 export function HomeScreen({ onStartPractice, onSignOut, userLabel }: HomeScreenProps) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Rhythm</Text>
-      <Text style={styles.welcome}>{userLabel}</Text>
-      <Text style={styles.hint}>Tap below to open Practice and play a rudiment with the metronome.</Text>
+    <ImageBackground
+      source={require("@/assets/background.png")}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <LinearGradient
+        colors={["rgba(0,0,0,1)", "rgba(0,0,0,0.9)", "rgba(0,0,0,0.4)"]}
+        locations={[0, 0.4, 1]}
+        style={styles.gradient}
+      >
+        <View style={styles.container}>
+          <Text style={styles.title}>Crash Course</Text>
+          <Text style={styles.welcome}>{userLabel}</Text>
+          <Text style={styles.hint}>Tap below to open Practice and play a rudiment with the metronome.</Text>
 
-      <TouchableOpacity style={styles.primaryButton} onPress={onStartPractice}>
-        <Text style={styles.primaryButtonText}>Start practice</Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={onStartPractice}>
+            <Text style={styles.primaryButtonText}>Start practice</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryButton} onPress={onSignOut}>
-        <Text style={styles.secondaryButtonText}>Sign out</Text>
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity style={styles.secondaryButton} onPress={onSignOut}>
+            <Text style={styles.secondaryButtonText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  gradient: {
+    flex: 1,
+    justifyContent: "center",
+  },
   container: {
     flex: 1,
     padding: 24,
-    backgroundColor: "#0f0f0f",
     justifyContent: "center",
   },
   title: {

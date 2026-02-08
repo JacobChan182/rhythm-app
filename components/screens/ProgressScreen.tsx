@@ -1,5 +1,6 @@
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import type { ProgressStats } from "@/types/progress";
+import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 
 type ProgressScreenProps = {
   stats: ProgressStats & { loading?: boolean };
@@ -50,6 +51,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
+    paddingTop: TAB_BAR_TOP_OFFSET + 24,
     backgroundColor: "#0f0f0f",
   },
   centered: {

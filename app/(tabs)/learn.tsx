@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 import { getCourses, getLessonsByCourseId } from "@/lib/curriculum";
 import { getRudimentById } from "@/lib/rudiments";
 import { parseCourseRudimentId } from "@/lib/courseRudiments";
@@ -187,13 +188,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    paddingTop: 16,
+    paddingTop: TAB_BAR_TOP_OFFSET + 24,
     backgroundColor: "#0f0f0f",
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: TAB_BAR_TOP_OFFSET,
     backgroundColor: "#0f0f0f",
     padding: 24,
   },

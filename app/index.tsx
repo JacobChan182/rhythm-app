@@ -61,7 +61,7 @@ export default function Index() {
           },
         ]}
       >
-        <Text style={styles.logo}>Rhythm</Text>
+        <Text style={styles.logo}>Crash Course</Text>
         <Text style={styles.tagline}>Practice. Track. Improve.</Text>
 
         <TouchableOpacity

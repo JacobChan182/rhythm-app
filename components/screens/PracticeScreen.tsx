@@ -2,6 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-nativ
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
 import { SlidingNoteLane } from "@/components/SlidingNoteLane";
+import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 
 type PracticeScreenProps = {
   phase: "idle" | "count-in" | "exercising" | "summary";
@@ -258,6 +259,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
+    paddingTop: TAB_BAR_TOP_OFFSET + 24,
     backgroundColor: "#0f0f0f",
   },
   title: {

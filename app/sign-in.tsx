@@ -78,11 +78,12 @@ export default function SignIn() {
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      <Animated.View
-        style={[styles.form, { opacity: fade, transform: [{ translateY: slide }] }]}
-      >
+      <View style={styles.centered}>
+        <Animated.View
+          style={[styles.form, { opacity: fade, transform: [{ translateY: slide }] }]}
+        >
         <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Sign in to continue to Rhythm</Text>
+        <Text style={styles.subtitle}>Sign in to continue to Crash Course</Text>
 
         <TextInput
           style={[styles.input, error ? styles.inputError : null]}
@@ -139,7 +140,8 @@ export default function SignIn() {
             <Text style={styles.footerLink}>Sign up</Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+        </Animated.View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -149,17 +151,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0a0a0a",
     paddingHorizontal: 24,
-    paddingTop: 56,
   },
   back: {
-    alignSelf: "flex-start",
-    marginBottom: 24,
+    position: "absolute",
+    top: 56,
+    left: 24,
+    zIndex: 1,
   },
   backText: {
     color: "#a1a1aa",
     fontSize: 15,
   },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+  },
   form: {
+    width: "100%",
     maxWidth: 400,
   },
   title: {

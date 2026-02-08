@@ -109,24 +109,25 @@ export default function SignUp() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={0}
     >
+      <TouchableOpacity
+        style={styles.back}
+        onPress={() => router.back()}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity
-          style={styles.back}
-          onPress={() => router.back()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-
-        <Animated.View
-          style={[styles.form, { opacity: fade, transform: [{ translateY: slide }] }]}
-        >
+        <View style={styles.centered}>
+          <Animated.View
+            style={[styles.form, { opacity: fade, transform: [{ translateY: slide }] }]}
+          >
           <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Join Rhythm to save your progress</Text>
+          <Text style={styles.subtitle}>Join Crash Course to save your progress</Text>
 
           <TextInput
             style={[styles.input, error ? styles.inputError : null]}
@@ -222,7 +223,8 @@ export default function SignUp() {
               <Text style={styles.footerLink}>Sign in</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+          </Animated.View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -234,20 +236,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#0a0a0a",
   },
   scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 40,
+    paddingVertical: 80,
   },
   back: {
-    alignSelf: "flex-start",
-    marginBottom: 24,
+    position: "absolute",
+    top: 56,
+    left: 24,
+    zIndex: 1,
   },
   backText: {
     color: "#a1a1aa",
     fontSize: 15,
   },
-  form: {
+  centered: {
+    width: "100%",
     maxWidth: 400,
+  },
+  form: {
+    width: "100%",
   },
   title: {
     fontSize: 28,
