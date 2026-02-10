@@ -52,6 +52,7 @@ export default function Practice() {
       expectedTimes={practice.expectedTimes}
       expectedTimesExtended={practice.expectedTimesExtended}
       liveResults={practice.liveResults}
+      lastFeedbackAccuracy={practice.lastFeedbackAccuracy}
       summaryResults={practice.summaryResults}
       counts={practice.counts}
     />

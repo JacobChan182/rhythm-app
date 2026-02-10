@@ -9,7 +9,7 @@ import {
   getExpectedHitTimesForRudimentCycles,
   getCycleDurationSeconds,
 } from "@/lib/noteScheduler";
-import { scoreSession, countByAccuracy, ASSIGNMENT_WINDOW_MS, type HitResult } from "@/lib/scoring";
+import { scoreSession, countByAccuracy, getThresholdsForBpm, ASSIGNMENT_WINDOW_MS, type HitResult } from "@/lib/scoring";
 import { getAllRudiments, getRudimentById } from "@/lib/rudiments";
 import { saveSession } from "@/lib/sessions";
 import type { Rudiment } from "@/types/rudiment";
@@ -47,7 +47,13 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const [expectedTimesExtended, setExpectedTimesExtended] = useState<number[]>([]);
   const [currentCycleIndex, setCurrentCycleIndex] = useState(0);
   const [liveResults, setLiveResults] = useState<HitResult[]>([]);
+  const [lastFeedbackAccuracy, setLastFeedbackAccuracy] = useState<"perfect" | "good" | "miss" | null>(null);
   const [summaryResults, setSummaryResults] = useState<HitResult[] | null>(null);
+  const missShownForIndicesRef = useRef<Set<number>>(new Set());
+  const lastFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastShownTapCountRef = useRef(0);
+  /** AudioContext time when we last showed Perfect/Great; don't show Miss for a short period after. */
+  const lastHitFeedbackTimeRef = useRef(0);
 
   const onBeatRef = useRef<((beat: number) => void) | null>(null);
   const sessionStartTimeRef = useRef<number>(0);
@@ -57,6 +63,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const bpmRef = useRef<number>(120);
   const rafRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  const currentCycleIndexRef = useRef(0);
   const [currentBeatInCycle, setCurrentBeatInCycle] = useState(-1);
 
   const defaultBpm = initialBpm ?? 120;
@@ -118,7 +125,13 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     };
   }, [phase]);
 
-  // Real-time scoring for the current cycle only (use current cycle's expected times so tap timer resets each loop)
+  // Reset per-cycle "miss shown" when cycle advances
+  useEffect(() => {
+    if (phase !== "exercising") return;
+    missShownForIndicesRef.current = new Set();
+  }, [phase, currentCycleIndex]);
+
+  // Real-time scoring for the current cycle only (ratio-based: error_ratio <= 0.02 Perfect, <= 0.05 Great)
   useEffect(() => {
     if (phase !== "exercising" && phase !== "summary") return;
     if (expectedTimes.length === 0 || !rudiment) return;
@@ -130,10 +143,12 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     const cycleStart = start + currentCycleIndex * cycleDur;
     const cycleEnd = cycleStart + cycleDur;
     const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
+    // Include taps slightly after cycleEnd so late hits on the last note still get feedback
     const tapsInCycle = tapCapture.taps
       .filter(
         (t) =>
-          t.time >= cycleStart - assignmentWindowSec && t.time < cycleEnd
+          t.time >= cycleStart - assignmentWindowSec &&
+          t.time < cycleEnd + assignmentWindowSec
       )
       .sort((a, b) => a.time - b.time)
       .map((t) => t.time);
@@ -142,9 +157,127 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       bpmRef.current,
       rudiment
     );
-    const results = scoreSession(tapsInCycle, expectedTimesThisCycle);
+    const thresholds = getThresholdsForBpm(bpmRef.current);
+    const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds);
+    results.forEach((r, i) => {
+      if (r.offsetMs != null) {
+        const sign = r.offsetMs >= 0 ? "+" : "";
+        console.log(`Note ${i}: ${sign}${Math.round(r.offsetMs)} ms (${r.accuracy})`);
+      } else {
+        console.log(`Note ${i}: miss`);
+      }
+    });
     setLiveResults(results);
+    // Show feedback for the tap that just happened (newest tap in this cycle), not just "max tapTime" result
+    const currentTapCount = tapCapture.taps.length;
+    if (currentTapCount === 0) lastShownTapCountRef.current = 0;
+    const hasNewTap = currentTapCount > lastShownTapCountRef.current;
+    if (hasNewTap && currentTapCount > 0) {
+      lastShownTapCountRef.current = currentTapCount;
+      const newestTapTime = tapCapture.taps[currentTapCount - 1].time;
+      // Only consider if this tap is in the current cycle
+      const isInCycle =
+        newestTapTime >= cycleStart - assignmentWindowSec &&
+        newestTapTime < cycleEnd + assignmentWindowSec;
+      if (isInCycle) {
+        let hitToShow: HitResult | null = null;
+        for (const r of results) {
+          if (r.tapTime != null && Math.abs(r.tapTime - newestTapTime) < 1e-9) {
+            hitToShow = r;
+            break;
+          }
+        }
+        // Fallback: tap wasn't assigned (e.g. boundary), classify vs closest expected
+        if (hitToShow == null && expectedTimesThisCycle.length > 0) {
+          let bestOffsetMs = Infinity;
+          for (const expectedTime of expectedTimesThisCycle) {
+            const offsetMs = (newestTapTime - expectedTime) * 1000;
+            if (Math.abs(offsetMs) < Math.abs(bestOffsetMs)) bestOffsetMs = offsetMs;
+          }
+          if (Math.abs(bestOffsetMs) <= thresholds.goodThresholdMs) {
+            const abs = Math.abs(bestOffsetMs);
+            hitToShow = {
+              index: 0,
+              expectedTime: 0,
+              tapTime: newestTapTime,
+              offsetMs: bestOffsetMs,
+              accuracy: abs <= thresholds.perfectThresholdMs ? "perfect" : "good",
+            };
+          }
+        }
+        if (hitToShow) {
+          if (lastFeedbackTimeoutRef.current) clearTimeout(lastFeedbackTimeoutRef.current);
+          lastHitFeedbackTimeRef.current = getAudioContextTime();
+          setLastFeedbackAccuracy(hitToShow.accuracy);
+          lastFeedbackTimeoutRef.current = setTimeout(() => {
+            setLastFeedbackAccuracy(null);
+            lastFeedbackTimeoutRef.current = null;
+          }, 400);
+        }
+      }
+    }
   }, [phase, expectedTimes.length, currentCycleIndex, tapCapture.taps, rudiment]);
+
+  currentCycleIndexRef.current = currentCycleIndex;
+
+  // Display Miss when current_time > beat_time + miss_window (poll). Don't show Miss for a while after any hit so Perfect/Great always get seen.
+  const MISS_WINDOW_RATIO = 0.05; // 5% of a beat after expected time
+  const MISS_COOLDOWN_AFTER_HIT_BEATS = 0.5; // don't show Miss for 0.5 beats after showing Perfect/Great
+  useEffect(() => {
+    if (phase !== "exercising" || !rudiment) return;
+    const interval = setInterval(() => {
+      const now = getAudioContextTime();
+      const start = exerciseStartTimeRef.current;
+      const cycleDur = cycleDurationRef.current;
+      const notesPerCycle = notesPerCycleRef.current;
+      const bpm = bpmRef.current;
+      if (cycleDur <= 0 || notesPerCycle <= 0) return;
+      const cycleIdx = currentCycleIndexRef.current;
+      const cycleStart = start + cycleIdx * cycleDur;
+      const beatMs = 60000 / bpm;
+      const beatSec = 60 / bpm;
+      const missWindowSec = (MISS_WINDOW_RATIO * beatMs) / 1000;
+      const missCooldownSec = MISS_COOLDOWN_AFTER_HIT_BEATS * beatSec;
+      const expectedTimesThisCycle = getExpectedHitTimesForRudiment(
+        cycleStart,
+        bpm,
+        rudiment
+      );
+      const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
+      const cycleEnd = cycleStart + cycleDur;
+      const tapsInCycle = tapCapture.taps
+        .filter(
+          (t) =>
+            t.time >= cycleStart - assignmentWindowSec &&
+            t.time < cycleEnd + assignmentWindowSec
+        )
+        .sort((a, b) => a.time - b.time)
+        .map((t) => t.time);
+      const thresholds = getThresholdsForBpm(bpm);
+      const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds);
+      setLiveResults(results);
+      const recentlyShowedHit = now - lastHitFeedbackTimeRef.current < missCooldownSec;
+      for (let i = 0; i < expectedTimesThisCycle.length; i++) {
+        const beatTime = expectedTimesThisCycle[i];
+        if (
+          now > beatTime + missWindowSec &&
+          results[i].accuracy === "miss" &&
+          !missShownForIndicesRef.current.has(i) &&
+          lastFeedbackTimeoutRef.current == null &&
+          !recentlyShowedHit
+        ) {
+          missShownForIndicesRef.current.add(i);
+          setLastFeedbackAccuracy("miss");
+          lastFeedbackTimeoutRef.current = setTimeout(() => {
+            setLastFeedbackAccuracy(null);
+            lastFeedbackTimeoutRef.current = null;
+          }, 400);
+          break;
+        }
+      }
+    }, 80);
+    return () => clearInterval(interval);
+  }, [phase, rudiment, tapCapture.taps]);
 
   const handleStartStop = useCallback(async () => {
     if (metronome.running) {
@@ -233,7 +366,8 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         rudiment,
         Math.max(cyclesPlayed, 1)
       );
-      results = scoreSession(tapTimes, expectedAll);
+      const thresholds = getThresholdsForBpm(metronome.bpm);
+      results = scoreSession(tapTimes, expectedAll, thresholds);
     }
     setSummaryResults(results);
     setPhase("summary");
@@ -304,6 +438,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     expectedTimes,
     expectedTimesExtended,
     liveResults,
+    lastFeedbackAccuracy,
     summaryResults,
     counts,
   };

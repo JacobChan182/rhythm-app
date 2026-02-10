@@ -3,13 +3,13 @@
  *
  * Algorithm (proximity-based matching):
  * 1. Match by proximity: each tap is matched to the expected time it is closest to,
- *    provided the distance is within assignmentWindowMs. So if a user misses a beat
- *    and taps on the next one, that tap is matched to the next expected time (catches back on).
+ *    provided the distance is within assignmentWindowMs.
  * 2. Assignment: we consider all (tap, expected) pairs within assignmentWindowMs, sort by
  *    distance ascending, and greedily assign closest pairs first. Each tap and each
  *    expected is used at most once.
  * 3. Offset in ms: offsetMs = (tapTime - expectedTime) * 1000. Negative = early, positive = late.
- * 4. Accuracy: |offsetMs| <= perfectThresholdMs → "perfect"; <= goodThresholdMs → "good"; else "miss".
+ * 4. Accuracy (ratio-based): beat_ms = 60000 / BPM, error_ratio = |offsetMs| / beat_ms.
+ *    error_ratio <= 0.02 → "perfect"; <= 0.05 → "good" (Great); else "miss".
  *    Expected notes with no assigned tap → "miss".
  */
 
@@ -39,6 +39,22 @@ export const DEFAULT_THRESHOLDS: ScoringThresholds = {
   perfectThresholdMs: 50,
   goodThresholdMs: 100,
 };
+
+const PERFECT_RATIO = 0.02;
+const GOOD_RATIO = 0.05;
+
+/**
+ * Compute thresholds in ms from BPM using error ratio:
+ * beat_ms = 60000 / BPM, error_ratio = |offsetMs| / beat_ms.
+ * Perfect <= 0.02, Great <= 0.05.
+ */
+export function getThresholdsForBpm(bpm: number): ScoringThresholds {
+  const beatMs = 60000 / bpm;
+  return {
+    perfectThresholdMs: PERFECT_RATIO * beatMs,
+    goodThresholdMs: GOOD_RATIO * beatMs,
+  };
+}
 
 /**
  * Classify a single offset (ms) into perfect / good / miss using the given thresholds.

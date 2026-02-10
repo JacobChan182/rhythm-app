@@ -31,6 +31,7 @@ type PracticeScreenProps = {
   expectedTimes: number[];
   expectedTimesExtended: number[];
   liveResults: HitResult[];
+  lastFeedbackAccuracy: "perfect" | "good" | "miss" | null;
   summaryResults: HitResult[] | null;
   counts: { perfect: number; good: number; miss: number } | null;
 };
@@ -58,10 +59,10 @@ export function PracticeScreen({
   expectedTimes,
   expectedTimesExtended,
   liveResults,
+  lastFeedbackAccuracy: hitFeedback,
   counts,
 }: PracticeScreenProps) {
   const [soundPickerOpen, setSoundPickerOpen] = useState(false);
-  const showLane = phase === "exercising" || phase === "summary";
   const showSummary = phase === "summary";
   const currentPreset = METRONOME_SOUND_PRESETS.find((p) => p.id === sound) ?? METRONOME_SOUND_PRESETS[0];
 
@@ -75,40 +76,6 @@ export function PracticeScreen({
         <Text style={styles.warn}>Metronome is web-only in this MVP.</Text>
       )}
 
-      {showLane && rudiment && (
-        <View style={styles.lane}>
-          <Text style={styles.laneTitle}>Notes</Text>
-          <View style={styles.laneRow}>
-            {rudiment.pattern.map((stroke, i) => {
-              const result = liveResults[i];
-              const status =
-                result?.tapTime == null && result?.accuracy === "miss"
-                  ? "pending"
-                  : result?.accuracy ?? "pending";
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.noteCell,
-                    status === "perfect" && styles.notePerfect,
-                    status === "good" && styles.noteGood,
-                    status === "miss" && styles.noteMiss,
-                  ]}
-                >
-                  <Text style={styles.noteStroke}>{stroke}</Text>
-                  {result?.offsetMs != null && (
-                    <Text style={styles.noteOffset}>
-                      {result.offsetMs > 0 ? "+" : ""}
-                      {Math.round(result.offsetMs)} ms
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       {(phase === "count-in" || phase === "exercising") &&
         rudiment &&
         expectedTimesExtended.length > 0 &&
@@ -117,6 +84,7 @@ export function PracticeScreen({
             expectedTimes={expectedTimesExtended}
             pattern={rudiment.pattern}
             bpm={bpm}
+            hitFeedback={hitFeedback}
           />
         )}
 

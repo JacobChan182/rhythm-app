@@ -14,6 +14,8 @@ type SlidingNoteLaneProps = {
   bpm: number;
   /** Optional fixed width; if omitted, lane fills container and uses onLayout to measure. */
   laneWidth?: number;
+  /** Show "Perfect" / "Great" / "Miss" to the left of the hit zone for a moment after each hit or miss. */
+  hitFeedback?: "perfect" | "good" | "miss" | null;
 };
 
 type Note = { time: number; hand: "L" | "R" };
@@ -50,6 +52,7 @@ export function SlidingNoteLane({
   pattern,
   bpm,
   laneWidth: laneWidthProp,
+  hitFeedback,
 }: SlidingNoteLaneProps) {
   const notes = useMemo(() => buildNotes(expectedTimes, pattern), [expectedTimes, pattern]);
   const nowVal = useRef(new Animated.Value(0)).current;
@@ -125,6 +128,27 @@ export function SlidingNoteLane({
       onLayout={laneWidthProp == null ? (e) => setMeasuredWidth(e.nativeEvent.layout.width) : undefined}
     >
       <View style={styles.track}>
+        {hitFeedback != null && (
+          <View
+            style={[styles.hitFeedbackWrap, { left: 0, width: hitZoneX - 8 }]}
+            pointerEvents="none"
+          >
+            <Text
+              style={[
+                styles.hitFeedbackText,
+                hitFeedback === "perfect" && styles.hitFeedbackPerfect,
+                hitFeedback === "good" && styles.hitFeedbackGood,
+                hitFeedback === "miss" && styles.hitFeedbackMiss,
+              ]}
+            >
+              {hitFeedback === "perfect"
+                ? "Perfect"
+                : hitFeedback === "good"
+                  ? "Great"
+                  : "Miss"}
+            </Text>
+          </View>
+        )}
         <View style={[styles.hitZone, { left: hitZoneX }]} />
         {visibleNotes.map((note) => {
           const tMin = note.time - APPROACH_SEC;
@@ -176,6 +200,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     position: "relative",
+  },
+  hitFeedbackWrap: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    zIndex: 11,
+  },
+  hitFeedbackText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  hitFeedbackPerfect: {
+    color: "#22c55e",
+  },
+  hitFeedbackGood: {
+    color: "#eab308",
+  },
+  hitFeedbackMiss: {
+    color: "#ef4444",
   },
   hitZone: {
     position: "absolute",
