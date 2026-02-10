@@ -18,7 +18,7 @@ const MIN_BPM = 40;
 const MAX_BPM = 240;
 const COUNT_IN_BEATS = 4;
 
-export type PracticePhase = "idle" | "count-in" | "exercising" | "summary";
+export type PracticePhase = "idle" | "exercising" | "summary";
 
 export type UsePracticeOptions = {
   /** Pre-resolved rudiment (e.g. from useResolvedRudiment). When set, rudimentId is ignored. */
@@ -312,8 +312,6 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       setCountInBeatsSeen((prev) => {
         const next = prev + 1;
         if (next >= COUNT_IN_BEATS) {
-          setCurrentCycleIndex(0);
-          setPhase("exercising");
           tapCapture.clearTaps();
           onBeatRef.current = null;
         }
@@ -350,7 +348,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       )
     );
 
-    setPhase("count-in");
+    setPhase("exercising");
   }, [metronome, bpmInput, user, rudiment, tapCapture.clearTaps]);
 
   const handleStopForSummary = useCallback(() => {

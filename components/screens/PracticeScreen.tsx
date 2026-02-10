@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Platform } from "react-native";
+import { useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Platform, Animated } from "react-native";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
 import type { MetronomeSoundId } from "@/lib/metronome";
@@ -8,7 +8,7 @@ import { SlidingNoteLane } from "@/components/SlidingNoteLane";
 import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 
 type PracticeScreenProps = {
-  phase: "idle" | "count-in" | "exercising" | "summary";
+  phase: "idle" | "exercising" | "summary";
   countInBeatsSeen: number;
   running: boolean;
   bpmInput: string;
@@ -63,8 +63,27 @@ export function PracticeScreen({
   counts,
 }: PracticeScreenProps) {
   const [soundPickerOpen, setSoundPickerOpen] = useState(false);
+  const nameFadeOpacity = useRef(new Animated.Value(1)).current;
+  const prevPhaseRef = useRef<typeof phase>("idle");
   const showSummary = phase === "summary";
   const currentPreset = METRONOME_SOUND_PRESETS.find((p) => p.id === sound) ?? METRONOME_SOUND_PRESETS[0];
+
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+    if (phase === "exercising") {
+      if (prevPhase === "idle" || prevPhase === "summary") {
+        nameFadeOpacity.setValue(1);
+        Animated.timing(nameFadeOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      nameFadeOpacity.setValue(1);
+    }
+  }, [phase, nameFadeOpacity]);
 
   return (
     <View style={styles.container}>
@@ -80,10 +99,17 @@ export function PracticeScreen({
         <>
           <View style={styles.beatRow}>
             {[0, 1, 2, 3].map((i) => {
+              // One run: first 4 beats = count-in (from countInBeatsSeen), then loop beat (currentBeatInCycle).
               const beat =
-                phase === "exercising" && currentBeatInCycle >= 0
-                  ? currentBeatInCycle
-                  : currentBeat;
+                phase === "exercising" && countInBeatsSeen >= 4
+                  ? currentBeatInCycle >= 0
+                    ? currentBeatInCycle
+                    : 3
+                  : phase === "exercising"
+                    ? countInBeatsSeen >= 1
+                      ? countInBeatsSeen - 1
+                      : 0
+                    : currentBeat;
               return (
                 <View
                   key={i}
@@ -101,23 +127,36 @@ export function PracticeScreen({
               );
             })}
           </View>
-          {(phase === "count-in" || phase === "exercising") &&
-          expectedTimesExtended.length > 0 ? (
-            <SlidingNoteLane
-              expectedTimes={expectedTimesExtended}
-              pattern={rudiment.pattern}
-              bpm={bpm}
-              hitFeedback={hitFeedback}
-            />
-          ) : (
-            <View style={styles.trackPlaceholderWrapper}>
-              <View style={styles.trackPlaceholderInner}>
-                <Text style={styles.trackPlaceholderText}>
-                  {rudiment.name}
-                </Text>
+          <View style={styles.trackContainer}>
+            {phase === "exercising" &&
+            expectedTimesExtended.length > 0 ? (
+              <SlidingNoteLane
+                expectedTimes={expectedTimesExtended}
+                pattern={rudiment.pattern}
+                bpm={bpm}
+                hitFeedback={hitFeedback}
+              />
+            ) : (
+              <View style={styles.trackPlaceholderWrapper}>
+                <View style={styles.trackPlaceholderInner}>
+                  <Text style={styles.trackPlaceholderText}>
+                    {rudiment.name}
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
+            )}
+            <Animated.View
+              style={[
+                styles.trackNameOverlay,
+                { opacity: nameFadeOpacity },
+              ]}
+              pointerEvents="none"
+            >
+              <Text style={styles.trackPlaceholderText}>
+                {rudiment.name}
+              </Text>
+            </Animated.View>
+          </View>
         </>
       )}
 
@@ -418,8 +457,11 @@ const styles = StyleSheet.create({
   beatLabelActive: {
     color: "#000",
   },
-  trackPlaceholderWrapper: {
+  trackContainer: {
+    position: "relative",
     marginBottom: 20,
+  },
+  trackPlaceholderWrapper: {
     height: 112,
     width: "100%",
   },
@@ -435,6 +477,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#a1a1aa",
+  },
+  trackNameOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 112,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   soundSelect: {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
