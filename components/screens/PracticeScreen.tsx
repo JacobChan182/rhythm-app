@@ -76,17 +76,50 @@ export function PracticeScreen({
         <Text style={styles.warn}>Metronome is web-only in this MVP.</Text>
       )}
 
-      {(phase === "count-in" || phase === "exercising") &&
-        rudiment &&
-        expectedTimesExtended.length > 0 &&
-        isWeb && (
-          <SlidingNoteLane
-            expectedTimes={expectedTimesExtended}
-            pattern={rudiment.pattern}
-            bpm={bpm}
-            hitFeedback={hitFeedback}
-          />
-        )}
+      {rudiment && isWeb && (
+        <>
+          <View style={styles.beatRow}>
+            {[0, 1, 2, 3].map((i) => {
+              const beat =
+                phase === "exercising" && currentBeatInCycle >= 0
+                  ? currentBeatInCycle
+                  : currentBeat;
+              return (
+                <View
+                  key={i}
+                  style={[styles.beatBox, beat === i && styles.beatBoxActive]}
+                >
+                  <Text
+                    style={[
+                      styles.beatLabel,
+                      beat === i && styles.beatLabelActive,
+                    ]}
+                  >
+                    {i + 1}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          {(phase === "count-in" || phase === "exercising") &&
+          expectedTimesExtended.length > 0 ? (
+            <SlidingNoteLane
+              expectedTimes={expectedTimesExtended}
+              pattern={rudiment.pattern}
+              bpm={bpm}
+              hitFeedback={hitFeedback}
+            />
+          ) : (
+            <View style={styles.trackPlaceholderWrapper}>
+              <View style={styles.trackPlaceholderInner}>
+                <Text style={styles.trackPlaceholderText}>
+                  {rudiment.name}
+                </Text>
+              </View>
+            </View>
+          )}
+        </>
+      )}
 
       <View style={styles.tapRow}>
         <TouchableOpacity
@@ -121,30 +154,6 @@ export function PracticeScreen({
         </TouchableOpacity>
       </View>
       <Text style={styles.tapCount}>{tapCount} taps</Text>
-
-      <View style={styles.beatRow}>
-        {[0, 1, 2, 3].map((i) => {
-          const beat =
-            phase === "exercising" && currentBeatInCycle >= 0
-              ? currentBeatInCycle
-              : currentBeat;
-          return (
-            <View
-              key={i}
-              style={[styles.beatBox, beat === i && styles.beatBoxActive]}
-            >
-              <Text
-                style={[
-                  styles.beatLabel,
-                  beat === i && styles.beatLabelActive,
-                ]}
-              >
-                {i + 1}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
 
       {isWeb && (
         <View style={styles.controls}>
@@ -408,6 +417,24 @@ const styles = StyleSheet.create({
   },
   beatLabelActive: {
     color: "#000",
+  },
+  trackPlaceholderWrapper: {
+    marginBottom: 20,
+    height: 112,
+    width: "100%",
+  },
+  trackPlaceholderInner: {
+    flex: 1,
+    height: "100%",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trackPlaceholderText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#a1a1aa",
   },
   soundSelect: {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
