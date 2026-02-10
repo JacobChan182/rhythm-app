@@ -37,6 +37,8 @@ let schedulerIntervalId: ReturnType<typeof setInterval> | null = null;
 let visualLoopId: number | null = null;
 let lastReportedBeat = -1;
 let isRunning = false;
+/** Time of the first beat (beat 0) when startMetronome was last called. For session sync. */
+let firstBeatTime = 0;
 
 const bufferCache = new Map<MetronomeSoundId, BufferPair>();
 
@@ -160,6 +162,14 @@ export function getAudioContextTime(): number {
 }
 
 /**
+ * Time of the first beat (beat 0) when startMetronome was last started.
+ * Call right after startMetronome() to align session/expected times with the actual clicks.
+ */
+export function getMetronomeFirstBeatTime(): number {
+  return firstBeatTime;
+}
+
+/**
  * Start the metronome. Loads buffers for current sound first, then starts scheduling.
  */
 export async function startMetronome(
@@ -179,6 +189,7 @@ export async function startMetronome(
   onBeat = onBeatCallback;
   isRunning = true;
   nextBeatTime = ctx.currentTime;
+  firstBeatTime = nextBeatTime;
   beatIndex = 0;
 
   scheduleBeats();

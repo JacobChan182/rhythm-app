@@ -3,7 +3,7 @@ import { useMetronome } from "@/hooks/useMetronome";
 import { useTapCapture } from "@/hooks/useTapCapture";
 import type { User } from "firebase/auth";
 import { getUserProgress, saveLastBpm, getDefaultBpm } from "@/lib/userProgress";
-import { getAudioContextTime } from "@/lib/metronome";
+import { getAudioContextTime, getMetronomeFirstBeatTime } from "@/lib/metronome";
 import {
   getExpectedHitTimesForRudiment,
   getExpectedHitTimesForRudimentCycles,
@@ -18,6 +18,16 @@ const MIN_BPM = 40;
 const MAX_BPM = 240;
 const COUNT_IN_BEATS = 4;
 
+/**
+ * TIMING: All of these use the same clock (AudioContext from lib/metronome).
+ * - Audial metronome: schedules clicks at ctx.currentTime.
+ * - Session start: getMetronomeFirstBeatTime() = time of first click.
+ * - 1234 display: RAF with getAudioContextTime() vs sessionStartTimeRef / exerciseStartTimeRef.
+ * - Beat visualizer (SlidingNoteLane): getAudioContextTime() for "now", expectedTimes in same seconds.
+ * - Taps: getAudioContextTime() in useTapCapture.
+ * - Scoring: tap times and expected times are both AudioContext seconds.
+ * Do not introduce Date.now(), performance.now(), or another context.
+ */
 export type PracticePhase = "idle" | "exercising" | "summary";
 
 export type UsePracticeOptions = {
@@ -102,20 +112,27 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     const tick = () => {
       if (!mountedRef.current) return;
       const now = getAudioContextTime();
+      const sessionStart = sessionStartTimeRef.current;
       const start = exerciseStartTimeRef.current;
       const cycleDur = cycleDurationRef.current;
       const bpm = bpmRef.current;
+      const beatDuration = 60 / bpm;
       if (cycleDur <= 0) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
-      const cycleIndex = Math.floor((now - start) / cycleDur);
-      setCurrentCycleIndex((prev) => (cycleIndex > prev ? cycleIndex : prev));
-      const cycleStart = start + cycleIndex * cycleDur;
-      const beatDuration = 60 / bpm;
-      const elapsedInCycle = now - cycleStart;
-      const beatInCycle = Math.floor(elapsedInCycle / beatDuration) % 4;
-      setCurrentBeatInCycle(beatInCycle);
+      // Same clock as audio: count-in and exercise beat from AudioContext time
+      if (now < start) {
+        const countInBeat = Math.floor((now - sessionStart) / beatDuration) % 4;
+        setCurrentBeatInCycle(countInBeat >= 0 ? countInBeat : 0);
+      } else {
+        const cycleIndex = Math.floor((now - start) / cycleDur);
+        setCurrentCycleIndex((prev) => (cycleIndex > prev ? cycleIndex : prev));
+        const cycleStart = start + cycleIndex * cycleDur;
+        const elapsedInCycle = now - cycleStart;
+        const beatInCycle = Math.floor(elapsedInCycle / beatDuration) % 4;
+        setCurrentBeatInCycle(beatInCycle);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -320,7 +337,8 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     };
 
     await metronome.start();
-    sessionStartTimeRef.current = getAudioContextTime();
+    const firstBeat = getMetronomeFirstBeatTime();
+    sessionStartTimeRef.current = firstBeat > 0 ? firstBeat : getAudioContextTime();
     setSessionStartTime(sessionStartTimeRef.current);
 
     const start = sessionStartTimeRef.current;

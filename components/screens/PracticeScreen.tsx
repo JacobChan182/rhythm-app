@@ -99,17 +99,13 @@ export function PracticeScreen({
         <>
           <View style={styles.beatRow}>
             {[0, 1, 2, 3].map((i) => {
-              // One run: first 4 beats = count-in (from countInBeatsSeen), then loop beat (currentBeatInCycle).
+              // Beat from same AudioContext time as metronome and scoring (no separate count-in phase).
               const beat =
-                phase === "exercising" && countInBeatsSeen >= 4
+                phase === "exercising"
                   ? currentBeatInCycle >= 0
                     ? currentBeatInCycle
-                    : 3
-                  : phase === "exercising"
-                    ? countInBeatsSeen >= 1
-                      ? countInBeatsSeen - 1
-                      : 0
-                    : currentBeat;
+                    : 0
+                  : currentBeat;
               return (
                 <View
                   key={i}
