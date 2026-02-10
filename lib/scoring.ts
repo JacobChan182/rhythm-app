@@ -1,16 +1,16 @@
 /**
  * Scoring: compare tap times to expected note times and classify each hit.
  *
- * Algorithm:
- * 1. Match by order: tap[i] is compared to expectedTimes[i]. So the first tap is
- *    scored against the first expected time, the second tap against the second, etc.
- * 2. Offset in ms: offsetMs = (tapTime - expectedTime) * 1000. Negative = early,
- *    positive = late. This is the timing error in milliseconds.
- * 3. Accuracy band: we use two thresholds (configurable). If |offsetMs| <= perfectThresholdMs
- *    → "perfect"; if |offsetMs| <= goodThresholdMs → "good"; otherwise → "miss".
- *    If there is no tap for an expected note (user skipped or ran out of taps), that note is "miss".
- * 4. We only score the first N taps where N = expectedTimes.length. Extra taps are ignored
- *    (could be counted as "extra" in a future version).
+ * Algorithm (proximity-based matching):
+ * 1. Match by proximity: each tap is matched to the expected time it is closest to,
+ *    provided the distance is within assignmentWindowMs. So if a user misses a beat
+ *    and taps on the next one, that tap is matched to the next expected time (catches back on).
+ * 2. Assignment: we consider all (tap, expected) pairs within assignmentWindowMs, sort by
+ *    distance ascending, and greedily assign closest pairs first. Each tap and each
+ *    expected is used at most once.
+ * 3. Offset in ms: offsetMs = (tapTime - expectedTime) * 1000. Negative = early, positive = late.
+ * 4. Accuracy: |offsetMs| <= perfectThresholdMs → "perfect"; <= goodThresholdMs → "good"; else "miss".
+ *    Expected notes with no assigned tap → "miss".
  */
 
 export type HitAccuracy = "perfect" | "good" | "miss";
@@ -54,24 +54,56 @@ function classifyOffset(
   return "miss";
 }
 
+/** Max distance (ms) for a tap to be assigned to an expected time. Beyond this we treat as wrong beat. */
+export const ASSIGNMENT_WINDOW_MS = 150;
+
 /**
- * Score a practice session: compare tap times to expected note times.
+ * Score a practice session: match taps to expected times by proximity, then classify each hit.
  *
  * @param tapTimes - Array of tap times in AudioContext seconds (same clock as expectedTimes).
  * @param expectedTimes - Array of expected hit times from the note scheduler.
  * @param thresholds - Optional. Perfect and good bands in ms; defaults to DEFAULT_THRESHOLDS.
- * @returns One HitResult per expected note. Tap i is matched to expected i. Missing taps → miss.
+ * @returns One HitResult per expected note. Taps are matched to the closest expected within ASSIGNMENT_WINDOW_MS.
  */
 export function scoreSession(
   tapTimes: number[],
   expectedTimes: number[],
   thresholds: ScoringThresholds = DEFAULT_THRESHOLDS
 ): HitResult[] {
+  const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
+
+  type Pair = { tapIdx: number; expectedIdx: number; distanceMs: number };
+  const pairs: Pair[] = [];
+
+  for (let t = 0; t < tapTimes.length; t++) {
+    const tapTime = tapTimes[t];
+    for (let e = 0; e < expectedTimes.length; e++) {
+      const expectedTime = expectedTimes[e];
+      const distanceSec = Math.abs(tapTime - expectedTime);
+      if (distanceSec <= assignmentWindowSec) {
+        const distanceMs = distanceSec * 1000;
+        pairs.push({ tapIdx: t, expectedIdx: e, distanceMs });
+      }
+    }
+  }
+
+  pairs.sort((a, b) => a.distanceMs - b.distanceMs);
+
+  const tapAssigned = new Set<number>();
+  const expectedToTap = new Map<number, number>();
+
+  for (const { tapIdx, expectedIdx } of pairs) {
+    if (tapAssigned.has(tapIdx) || expectedToTap.has(expectedIdx)) continue;
+    tapAssigned.add(tapIdx);
+    expectedToTap.set(expectedIdx, tapIdx);
+  }
+
   const results: HitResult[] = [];
 
   for (let i = 0; i < expectedTimes.length; i++) {
     const expectedTime = expectedTimes[i];
-    const tapTime = i < tapTimes.length ? tapTimes[i] : null;
+    const tapIdx = expectedToTap.get(i);
+    const tapTime = tapIdx !== undefined ? tapTimes[tapIdx] : null;
 
     if (tapTime === null) {
       results.push({
@@ -84,7 +116,6 @@ export function scoreSession(
       continue;
     }
 
-    // Offset in milliseconds. Negative = early, positive = late.
     const offsetMs = (tapTime - expectedTime) * 1000;
     const accuracy = classifyOffset(offsetMs, thresholds);
 

@@ -136,48 +136,50 @@ export default function Learn() {
         {courses.length === 0 ? (
           <Text style={styles.emptyText}>No courses yet. Add some in the curriculum builder.</Text>
         ) : (
-          courses.map((course) => (
-            <View key={course.id} style={styles.courseBlock}>
-              <TouchableOpacity
-                style={styles.courseRow}
-                onPress={() => toggleCourse(course.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.courseTitle}>{course.title}</Text>
-                <Text style={styles.courseChevron}>
-                  {expandedCourseId === course.id ? "▼" : "▶"}
-                </Text>
-              </TouchableOpacity>
-              {expandedCourseId === course.id && (
-                <View style={styles.lessonsContainer}>
-                  {lessonsLoading[course.id] ? (
-                    <ActivityIndicator size="small" color="#22c55e" style={styles.lessonLoader} />
-                  ) : (
-                    (lessonsByCourse[course.id] ?? []).map((lesson) => (
-                      <TouchableOpacity
-                        key={lesson.id}
-                        style={styles.lessonRow}
-                        onPress={() => openLesson(lesson)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.lessonRowTitle}>{lesson.title}</Text>
-                        {lesson.rudimentIds.length > 0 ? (
-                          <Text style={styles.lessonBadge}>
-                            {lesson.rudimentIds.length} rudiment{lesson.rudimentIds.length !== 1 ? "s" : ""}
-                          </Text>
-                        ) : null}
-                      </TouchableOpacity>
-                    ))
-                  )}
-                  {expandedCourseId === course.id &&
-                    !lessonsLoading[course.id] &&
-                    (lessonsByCourse[course.id] ?? []).length === 0 && (
-                      <Text style={styles.emptyLessons}>No lessons in this course.</Text>
+          <View style={styles.coursesGrid}>
+            {courses.map((course) => (
+              <View key={course.id} style={styles.courseBlock}>
+                <TouchableOpacity
+                  style={styles.courseRow}
+                  onPress={() => toggleCourse(course.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.courseTitle}>{course.title}</Text>
+                  <Text style={styles.courseChevron}>
+                    {expandedCourseId === course.id ? "▼" : "▶"}
+                  </Text>
+                </TouchableOpacity>
+                {expandedCourseId === course.id && (
+                  <View style={styles.lessonsContainer}>
+                    {lessonsLoading[course.id] ? (
+                      <ActivityIndicator size="small" color="#22c55e" style={styles.lessonLoader} />
+                    ) : (
+                      (lessonsByCourse[course.id] ?? []).map((lesson) => (
+                        <TouchableOpacity
+                          key={lesson.id}
+                          style={styles.lessonRow}
+                          onPress={() => openLesson(lesson)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.lessonRowTitle}>{lesson.title}</Text>
+                          {lesson.rudimentIds.length > 0 ? (
+                            <Text style={styles.lessonBadge}>
+                              {lesson.rudimentIds.length} rudiment{lesson.rudimentIds.length !== 1 ? "s" : ""}
+                            </Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))
                     )}
-                </View>
-              )}
-            </View>
-          ))
+                    {expandedCourseId === course.id &&
+                      !lessonsLoading[course.id] &&
+                      (lessonsByCourse[course.id] ?? []).length === 0 && (
+                        <Text style={styles.emptyLessons}>No lessons in this course.</Text>
+                      )}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
     </View>
@@ -240,8 +242,17 @@ const styles = StyleSheet.create({
     color: "#71717a",
     fontSize: 15,
   },
+  coursesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -6,
+    justifyContent: "center",
+  },
   courseBlock: {
-    marginBottom: 8,
+    width: "30%",
+    marginHorizontal: 6,
+    marginBottom: 12,
+    minHeight: 280,
     backgroundColor: "#18181b",
     borderRadius: 12,
     overflow: "hidden",

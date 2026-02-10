@@ -1,52 +1,46 @@
 /**
- * Metronome using Web Audio API. Timing is driven only by the AudioContext clock.
+ * Metronome using Web Audio API and WAV assets. Timing is driven only by the AudioContext clock.
  *
  * TIMING MODEL (no setInterval/setTimeout for when clicks fire):
  * - Beats are scheduled at exact AudioContext.currentTime values. The audio engine
  *   plays each click at the scheduled time; JS timers are not used for beat timing.
  * - A refill loop runs every BEAT_INTERVAL_MS and calls scheduleBeats(). That loop
  *   only decides "what to schedule next"; it does NOT determine when sound plays.
- *   When each click is heard is 100% determined by the schedule (context.currentTime).
  *
  * Web-only; native would need a different implementation.
  */
 
-/** How far ahead we schedule beats (seconds). Keeps a small queue so we never run out. */
+import { Asset } from "expo-asset";
+import {
+  METRONOME_SOUND_PRESETS,
+  DEFAULT_METRONOME_SOUND,
+  type MetronomeSoundId,
+} from "./metronomePresets";
+
+export type { MetronomeSoundId };
+export { METRONOME_SOUND_PRESETS };
+
+/** How far ahead we schedule beats (seconds). */
 const LOOKAHEAD_SEC = 0.2;
-/** How often we run the scheduler to refill the queue. Not the beat period. */
+/** How often we run the scheduler to refill the queue. */
 const SCHEDULER_INTERVAL_MS = 50;
 
-export type MetronomeSoundId = "classic" | "wood" | "tick" | "high";
-
-export type MetronomeSoundPreset = {
-  id: MetronomeSoundId;
-  label: string;
-  freq: number;
-  type: OscillatorType;
-  durationSec: number;
-  level: number;
-  accentLevel: number;
-};
-
-export const METRONOME_SOUND_PRESETS: MetronomeSoundPreset[] = [
-  { id: "classic", label: "Classic", freq: 1000, type: "sine", durationSec: 0.03, level: 0.3, accentLevel: 0.5 },
-  { id: "wood", label: "Wood", freq: 280, type: "sine", durationSec: 0.04, level: 0.35, accentLevel: 0.55 },
-  { id: "tick", label: "Tick", freq: 2400, type: "sine", durationSec: 0.015, level: 0.25, accentLevel: 0.4 },
-  { id: "high", label: "High", freq: 1600, type: "sine", durationSec: 0.025, level: 0.28, accentLevel: 0.45 },
-];
+type BufferPair = { accent: AudioBuffer; normal: AudioBuffer };
 
 let audioContext: AudioContext | null = null;
 let nextBeatTime = 0;
 let beatIndex = 0;
 let bpm = 120;
-let soundId: MetronomeSoundId = "classic";
+let soundId: MetronomeSoundId = DEFAULT_METRONOME_SOUND;
 let onBeat: ((index: number) => void) | null = null;
 let schedulerIntervalId: ReturnType<typeof setInterval> | null = null;
 let visualLoopId: number | null = null;
 let lastReportedBeat = -1;
 let isRunning = false;
 
-function getPreset(id: MetronomeSoundId): MetronomeSoundPreset {
+const bufferCache = new Map<MetronomeSoundId, BufferPair>();
+
+function getPreset(id: MetronomeSoundId) {
   return METRONOME_SOUND_PRESETS.find((p) => p.id === id) ?? METRONOME_SOUND_PRESETS[0];
 }
 
@@ -60,58 +54,76 @@ function getContext(): AudioContext | null {
 }
 
 /**
- * Current time on the same AudioContext clock the metronome uses.
- * Use this for tap timestamps so taps and beats share one time base (no scoring yet).
- * Returns 0 if context is not available (e.g. non-web).
+ * Load WAV assets for a preset into decoded AudioBuffers and cache them.
  */
-export function getAudioContextTime(): number {
+export async function loadMetronomeBuffers(presetId: MetronomeSoundId): Promise<BufferPair | null> {
   const ctx = getContext();
-  return ctx ? ctx.currentTime : 0;
+  if (!ctx) return null;
+  const preset = getPreset(presetId);
+  if (!preset) return null;
+
+  const cached = bufferCache.get(presetId);
+  if (cached) return cached;
+
+  try {
+    const [hiAsset, loAsset] = await Promise.all([
+      Asset.fromModule(preset.hi).downloadAsync(),
+      Asset.fromModule(preset.lo).downloadAsync(),
+    ]);
+    const hiUri = hiAsset.localUri ?? hiAsset.uri;
+    const loUri = loAsset.localUri ?? loAsset.uri;
+    if (!hiUri || !loUri) return null;
+
+    const [hiAb, loAb] = await Promise.all([
+      fetch(hiUri).then((r) => r.arrayBuffer()),
+      fetch(loUri).then((r) => r.arrayBuffer()),
+    ]);
+    const [accent, normal] = await Promise.all([
+      new Promise<AudioBuffer>((res, rej) =>
+        ctx.decodeAudioData(hiAb.slice(0), res, rej)
+      ),
+      new Promise<AudioBuffer>((res, rej) =>
+        ctx.decodeAudioData(loAb.slice(0), res, rej)
+      ),
+    ]);
+    const pair: BufferPair = { accent, normal };
+    bufferCache.set(presetId, pair);
+    return pair;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Play one click at a precise time using an oscillator.
- * Timing: when the click is heard is exactly `when` on the AudioContext clock.
- * We use OscillatorNode + GainNode; start/stop are scheduled on the same clock.
+ * Play one click at a precise time using a cached WAV buffer.
  */
 function scheduleClick(ctx: AudioContext, when: number, isAccent: boolean): void {
-  const preset = getPreset(soundId);
-  const osc = ctx.createOscillator();
-  const gainNode = ctx.createGain();
-  osc.type = preset.type;
-  osc.frequency.value = preset.freq;
-  osc.connect(gainNode);
-  gainNode.connect(ctx.destination);
-
-  const level = isAccent ? preset.accentLevel : preset.level;
-  gainNode.gain.setValueAtTime(0, when);
-  gainNode.gain.setValueAtTime(level, when + 0.001);
-  gainNode.gain.setValueAtTime(0, when + preset.durationSec);
-
-  osc.start(when);
-  osc.stop(when + preset.durationSec);
+  const pair = bufferCache.get(soundId);
+  if (!pair) return;
+  const buffer = isAccent ? pair.accent : pair.normal;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start(when);
 }
 
 /**
- * TIMING: This is the only place beat times are computed. We use ctx.currentTime
- * (the audio clock) and add beatDuration for each beat. No JS timer defines when
- * clicks occur; we only schedule AudioNodes at those times.
- * Refill: we schedule every beat whose time falls in [now, now + LOOKAHEAD_SEC].
+ * TIMING: Beat times are computed from ctx.currentTime + beatDuration.
+ * Refill: schedule every beat in [now, now + LOOKAHEAD_SEC].
  */
 function scheduleBeats(): void {
   const ctx = getContext();
   if (!ctx || !isRunning) return;
+  if (!bufferCache.has(soundId)) return;
 
   const now = ctx.currentTime;
   const beatDuration = 60 / bpm;
 
-  // If we fell behind (e.g. tab backgrounded), advance to next logical beat
   while (nextBeatTime < now - beatDuration * 0.5) {
     nextBeatTime += beatDuration;
     beatIndex += 1;
   }
 
-  // Schedule all beats in the lookahead window. Playback time = nextBeatTime (audio clock).
   while (nextBeatTime < now + LOOKAHEAD_SEC) {
     const isAccent = beatIndex % 4 === 0;
     scheduleClick(ctx, nextBeatTime, isAccent);
@@ -120,10 +132,6 @@ function scheduleBeats(): void {
   }
 }
 
-/**
- * Visual sync: we report the current beat in bar (0–3) so UI can highlight.
- * Derived from the same scheduler state (beatIndex), not from a separate timer.
- */
 function visualLoop(): void {
   if (!isRunning || !onBeat) {
     visualLoopId = null;
@@ -144,8 +152,15 @@ export function isWeb(): boolean {
 }
 
 /**
- * Start the metronome. Call from a user gesture so the context can resume.
- * Beat timing is entirely from AudioContext; no setInterval for clicks.
+ * Current time on the same AudioContext clock the metronome uses.
+ */
+export function getAudioContextTime(): number {
+  const ctx = getContext();
+  return ctx ? ctx.currentTime : 0;
+}
+
+/**
+ * Start the metronome. Loads buffers for current sound first, then starts scheduling.
  */
 export async function startMetronome(
   bpmArg: number,
@@ -157,6 +172,9 @@ export async function startMetronome(
   if (ctx.state === "suspended") await ctx.resume();
   if (ctx.state !== "running") return false;
 
+  const loaded = await loadMetronomeBuffers(soundId);
+  if (!loaded) return false;
+
   bpm = Math.max(20, Math.min(300, bpmArg));
   onBeat = onBeatCallback;
   isRunning = true;
@@ -164,7 +182,6 @@ export async function startMetronome(
   beatIndex = 0;
 
   scheduleBeats();
-  // This interval only refills the schedule; it does NOT set when clicks play.
   schedulerIntervalId = setInterval(scheduleBeats, SCHEDULER_INTERVAL_MS);
   visualLoopId = requestAnimationFrame(visualLoop);
 
@@ -199,4 +216,5 @@ export function getMetronomeSound(): MetronomeSoundId {
 
 export function setMetronomeSound(id: MetronomeSoundId): void {
   soundId = id;
+  if (isWeb()) void loadMetronomeBuffers(id);
 }

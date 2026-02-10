@@ -1,4 +1,5 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Platform } from "react-native";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
 import type { MetronomeSoundId } from "@/lib/metronome";
@@ -59,9 +60,10 @@ export function PracticeScreen({
   liveResults,
   counts,
 }: PracticeScreenProps) {
-  const showCountIn = phase === "count-in";
+  const [soundPickerOpen, setSoundPickerOpen] = useState(false);
   const showLane = phase === "exercising" || phase === "summary";
   const showSummary = phase === "summary";
+  const currentPreset = METRONOME_SOUND_PRESETS.find((p) => p.id === sound) ?? METRONOME_SOUND_PRESETS[0];
 
   return (
     <View style={styles.container}>
@@ -71,32 +73,6 @@ export function PracticeScreen({
       </Text>
       {!isWeb && (
         <Text style={styles.warn}>Metronome is web-only in this MVP.</Text>
-      )}
-
-      {showCountIn && (
-        <View style={styles.countIn}>
-          <Text style={styles.countInLabel}>Count in</Text>
-          <View style={styles.countInDots}>
-            {[0, 1, 2, 3].map((i) => (
-              <View
-                key={i}
-                style={[
-                  styles.countInDot,
-                  i < countInBeatsSeen && styles.countInDotDone,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.countInDotText,
-                    i < countInBeatsSeen && styles.countInDotTextDone,
-                  ]}
-                >
-                  {i + 1}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
       )}
 
       {showLane && rudiment && (
@@ -133,7 +109,7 @@ export function PracticeScreen({
         </View>
       )}
 
-      {phase === "exercising" &&
+      {(phase === "count-in" || phase === "exercising") &&
         rudiment &&
         expectedTimesExtended.length > 0 &&
         isWeb && (
@@ -203,34 +179,76 @@ export function PracticeScreen({
       </View>
 
       {isWeb && (
-        <View style={styles.soundRow}>
-          <Text style={styles.soundLabel}>Sound</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.soundScroll}
-          >
-            {METRONOME_SOUND_PRESETS.map((preset) => (
+        <View style={styles.controls}>
+          <Text style={styles.label}>Sound</Text>
+          {Platform.OS === "web" ? (
+            <select
+              value={sound}
+              onChange={(e) =>
+                onSoundChange((e.target as HTMLSelectElement).value as MetronomeSoundId)
+              }
+              style={styles.soundSelect as unknown as React.CSSProperties}
+              disabled={running}
+            >
+              {METRONOME_SOUND_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
               <TouchableOpacity
-                key={preset.id}
-                style={[
-                  styles.soundChip,
-                  sound === preset.id && styles.soundChipActive,
-                ]}
-                onPress={() => onSoundChange(preset.id)}
+                style={styles.soundTouchable}
+                onPress={() => setSoundPickerOpen(true)}
                 disabled={running}
               >
-                <Text
-                  style={[
-                    styles.soundChipText,
-                    sound === preset.id && styles.soundChipTextActive,
-                  ]}
-                >
-                  {preset.label}
-                </Text>
+                <Text style={styles.soundTouchableText}>{currentPreset.label}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+              <Modal
+                visible={soundPickerOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSoundPickerOpen(false)}
+              >
+                <TouchableOpacity
+                  style={styles.soundModalBackdrop}
+                  activeOpacity={1}
+                  onPress={() => setSoundPickerOpen(false)}
+                >
+                  <View style={styles.soundModalContent}>
+                    <ScrollView
+                      style={styles.soundModalScroll}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {METRONOME_SOUND_PRESETS.map((preset) => (
+                      <TouchableOpacity
+                        key={preset.id}
+                        style={[
+                          styles.soundModalOption,
+                          sound === preset.id && styles.soundModalOptionActive,
+                        ]}
+                        onPress={() => {
+                          onSoundChange(preset.id);
+                          setSoundPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.soundModalOptionText,
+                            sound === preset.id && styles.soundModalOptionTextActive,
+                          ]}
+                        >
+                          {preset.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    </ScrollView>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+            </>
+          )}
         </View>
       )}
 
@@ -315,38 +333,6 @@ const styles = StyleSheet.create({
     color: "#f59e0b",
     marginBottom: 16,
   },
-  countIn: {
-    marginBottom: 24,
-    alignItems: "center",
-  },
-  countInLabel: {
-    fontSize: 14,
-    color: "#888",
-    marginBottom: 8,
-  },
-  countInDots: {
-    flexDirection: "row",
-  },
-  countInDot: {
-    width: 40,
-    height: 40,
-    marginHorizontal: 6,
-    borderRadius: 20,
-    backgroundColor: "#1a1a1a",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  countInDotDone: {
-    backgroundColor: "#22c55e",
-  },
-  countInDotText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#666",
-  },
-  countInDotTextDone: {
-    color: "#000",
-  },
   lane: {
     marginBottom: 20,
   },
@@ -394,6 +380,7 @@ const styles = StyleSheet.create({
   },
   tapArea: {
     flex: 1,
+    minHeight: 300,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
     paddingVertical: 24,
@@ -454,34 +441,64 @@ const styles = StyleSheet.create({
   beatLabelActive: {
     color: "#000",
   },
-  soundRow: {
-    marginBottom: 16,
-  },
-  soundLabel: {
-    color: "#888",
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  soundScroll: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  soundChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+  soundSelect: {
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
+    fontSize: 16,
+    color: "#fff",
     backgroundColor: "#1a1a1a",
+    padding: 12,
+    borderRadius: 8,
+    minWidth: 160,
+    maxWidth: 220,
+    borderWidth: 0,
+    cursor: "pointer",
+    marginRight: 12,
   },
-  soundChipActive: {
-    backgroundColor: "#22c55e",
+  soundTouchable: {
+    backgroundColor: "#1a1a1a",
+    padding: 12,
+    borderRadius: 8,
+    minWidth: 160,
+    maxWidth: 220,
+    marginRight: 12,
   },
-  soundChipText: {
-    fontSize: 14,
-    color: "#888",
+  soundTouchableText: {
+    fontSize: 16,
+    color: "#fff",
     fontWeight: "500",
   },
-  soundChipTextActive: {
+  soundModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  soundModalContent: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    minWidth: 240,
+    maxHeight: 320,
+  },
+  soundModalScroll: {
+    maxHeight: 280,
+  },
+  soundModalOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginVertical: 2,
+  },
+  soundModalOptionActive: {
+    backgroundColor: "#22c55e",
+  },
+  soundModalOptionText: {
+    fontSize: 16,
+    color: "#e5e5e5",
+  },
+  soundModalOptionTextActive: {
     color: "#000",
+    fontWeight: "600",
   },
   controls: {
     flexDirection: "row",

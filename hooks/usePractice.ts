@@ -9,7 +9,7 @@ import {
   getExpectedHitTimesForRudimentCycles,
   getCycleDurationSeconds,
 } from "@/lib/noteScheduler";
-import { scoreSession, countByAccuracy, type HitResult } from "@/lib/scoring";
+import { scoreSession, countByAccuracy, ASSIGNMENT_WINDOW_MS, type HitResult } from "@/lib/scoring";
 import { getAllRudiments, getRudimentById } from "@/lib/rudiments";
 import { saveSession } from "@/lib/sessions";
 import type { Rudiment } from "@/types/rudiment";
@@ -129,8 +129,12 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
 
     const cycleStart = start + currentCycleIndex * cycleDur;
     const cycleEnd = cycleStart + cycleDur;
+    const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
     const tapsInCycle = tapCapture.taps
-      .filter((t) => t.time >= cycleStart && t.time < cycleEnd)
+      .filter(
+        (t) =>
+          t.time >= cycleStart - assignmentWindowSec && t.time < cycleEnd
+      )
       .sort((a, b) => a.time - b.time)
       .map((t) => t.time);
     const expectedTimesThisCycle = getExpectedHitTimesForRudiment(
@@ -175,30 +179,6 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       setCountInBeatsSeen((prev) => {
         const next = prev + 1;
         if (next >= COUNT_IN_BEATS) {
-          const start = sessionStartTimeRef.current;
-          const exerciseStartTime = start + COUNT_IN_BEATS * (60 / metronome.bpm);
-          exerciseStartTimeRef.current = exerciseStartTime;
-          const times = getExpectedHitTimesForRudiment(
-            exerciseStartTime,
-            metronome.bpm,
-            rudiment
-          );
-          const cycleDuration = getCycleDurationSeconds(
-            metronome.bpm,
-            rudiment.subdivision,
-            rudiment.pattern.length
-          );
-          cycleDurationRef.current = cycleDuration;
-          notesPerCycleRef.current = times.length;
-          setExpectedTimes(times);
-          setExpectedTimesExtended(
-            getExpectedHitTimesForRudimentCycles(
-              exerciseStartTime,
-              metronome.bpm,
-              rudiment,
-              30
-            )
-          );
           setCurrentCycleIndex(0);
           setPhase("exercising");
           tapCapture.clearTaps();
@@ -211,6 +191,32 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     await metronome.start();
     sessionStartTimeRef.current = getAudioContextTime();
     setSessionStartTime(sessionStartTimeRef.current);
+
+    const start = sessionStartTimeRef.current;
+    const exerciseStartTime = start + COUNT_IN_BEATS * (60 / clamped);
+    exerciseStartTimeRef.current = exerciseStartTime;
+    const cycleDuration = getCycleDurationSeconds(
+      clamped,
+      rudiment.subdivision,
+      rudiment.pattern.length
+    );
+    cycleDurationRef.current = cycleDuration;
+    const timesForCycle = getExpectedHitTimesForRudiment(
+      exerciseStartTime,
+      clamped,
+      rudiment
+    );
+    notesPerCycleRef.current = timesForCycle.length;
+    setExpectedTimes(timesForCycle);
+    setExpectedTimesExtended(
+      getExpectedHitTimesForRudimentCycles(
+        exerciseStartTime,
+        clamped,
+        rudiment,
+        30
+      )
+    );
+
     setPhase("count-in");
   }, [metronome, bpmInput, user, rudiment, tapCapture.clearTaps]);
 
