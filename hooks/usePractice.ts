@@ -9,7 +9,7 @@ import {
   getExpectedHitTimesForRudimentCycles,
   getCycleDurationSeconds,
 } from "@/lib/noteScheduler";
-import { scoreSession, countByAccuracy, getThresholdsForBpm, ASSIGNMENT_WINDOW_MS, type HitResult } from "@/lib/scoring";
+import { scoreSession, countByAccuracy, getThresholdsForBpm, ASSIGNMENT_WINDOW_MS, LATENCY_COMPENSATION_MS, type HitResult } from "@/lib/scoring";
 import { getAllRudiments, getRudimentById } from "@/lib/rudiments";
 import { saveSession } from "@/lib/sessions";
 import type { Rudiment } from "@/types/rudiment";
@@ -221,11 +221,11 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
             break;
           }
         }
-        // Fallback: tap wasn't assigned (e.g. boundary), classify vs closest expected
+        // Fallback: tap wasn't assigned (e.g. boundary), classify vs closest expected (with latency compensation)
         if (hitToShow == null && expectedTimesThisCycle.length > 0) {
           let bestOffsetMs = Infinity;
           for (const expectedTime of expectedTimesThisCycle) {
-            const offsetMs = (newestTapTime - expectedTime) * 1000;
+            const offsetMs = (newestTapTime - expectedTime) * 1000 - LATENCY_COMPENSATION_MS;
             if (Math.abs(offsetMs) < Math.abs(bestOffsetMs)) bestOffsetMs = offsetMs;
           }
           if (Math.abs(bestOffsetMs) <= thresholds.goodThresholdMs) {
@@ -271,6 +271,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       const beatMs = 60000 / bpm;
       const beatSec = 60 / bpm;
       const missWindowSec = (MISS_WINDOW_RATIO * beatMs) / 1000;
+      const latencyBufferSec = LATENCY_COMPENSATION_MS / 1000;
       const missCooldownSec = MISS_COOLDOWN_AFTER_HIT_BEATS * beatSec;
       const expectedTimesThisCycle = getExpectedHitTimesForRudiment(
         cycleStart,
@@ -301,7 +302,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       for (let i = 0; i < expectedTimesThisCycle.length; i++) {
         const beatTime = expectedTimesThisCycle[i];
         if (
-          now > beatTime + missWindowSec &&
+          now > beatTime + missWindowSec + latencyBufferSec &&
           results[i].accuracy === "miss" &&
           !missShownForIndicesRef.current.has(i) &&
           lastFeedbackTimeoutRef.current == null &&

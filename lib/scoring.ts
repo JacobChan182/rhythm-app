@@ -7,11 +7,17 @@
  * 2. Assignment: we consider all (tap, expected) pairs within assignmentWindowMs, sort by
  *    distance ascending, and greedily assign closest pairs first. Each tap and each
  *    expected is used at most once.
- * 3. Offset in ms: offsetMs = (tapTime - expectedTime) * 1000. Negative = early, positive = late.
- * 4. Accuracy (ratio-based): beat_ms = 60000 / BPM, error_ratio = |offsetMs| / beat_ms.
- *    error_ratio <= 0.02 → "perfect"; <= 0.05 → "good" (Great); else "miss".
+ * 3. Latency compensation: tap times are treated as (tapTime - LATENCY_COMPENSATION_MS) so
+ *    average audio/visual/input delay doesn't penalize users.
+ * 4. Offset in ms: offsetMs = (effectiveTapTime - expectedTime) * 1000. Negative = early, positive = late.
+ * 5. Accuracy (ratio-based): beat_ms = 60000 / BPM, error_ratio = |offsetMs| / beat_ms.
+ *    error_ratio <= PERFECT_RATIO → "perfect"; <= GOOD_RATIO → "good" (Great); else "miss".
  *    Expected notes with no assigned tap → "miss".
  */
+
+/** Buffer (ms) to compensate for average audio output, display, and input latency. Applied so taps are scored as if they occurred this much earlier. */
+export const LATENCY_COMPENSATION_MS = 15;
+const LATENCY_COMPENSATION_SEC = LATENCY_COMPENSATION_MS / 1000;
 
 export type HitAccuracy = "perfect" | "good" | "miss";
 
@@ -92,10 +98,10 @@ export function scoreSession(
   const pairs: Pair[] = [];
 
   for (let t = 0; t < tapTimes.length; t++) {
-    const tapTime = tapTimes[t];
+    const effectiveTapTime = tapTimes[t] - LATENCY_COMPENSATION_SEC;
     for (let e = 0; e < expectedTimes.length; e++) {
       const expectedTime = expectedTimes[e];
-      const distanceSec = Math.abs(tapTime - expectedTime);
+      const distanceSec = Math.abs(effectiveTapTime - expectedTime);
       if (distanceSec <= assignmentWindowSec) {
         const distanceMs = distanceSec * 1000;
         pairs.push({ tapIdx: t, expectedIdx: e, distanceMs });
@@ -132,7 +138,8 @@ export function scoreSession(
       continue;
     }
 
-    const offsetMs = (tapTime - expectedTime) * 1000;
+    const effectiveTapTime = tapTime - LATENCY_COMPENSATION_SEC;
+    const offsetMs = (effectiveTapTime - expectedTime) * 1000;
     const accuracy = classifyOffset(offsetMs, thresholds);
 
     results.push({
