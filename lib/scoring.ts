@@ -7,8 +7,8 @@
  * 2. Assignment: we consider all (tap, expected) pairs within assignmentWindowMs, sort by
  *    distance ascending, and greedily assign closest pairs first. Each tap and each
  *    expected is used at most once.
- * 3. Latency compensation: tap times are treated as (tapTime - LATENCY_COMPENSATION_MS) so
- *    average audio/visual/input delay doesn't penalize users.
+ * 3. Auditory compensation: tap times are treated as (tapTime - auditoryCompensationMs) so
+ *    average audio output delay doesn't penalize users.
  * 4. Offset in ms: offsetMs = (effectiveTapTime - expectedTime) * 1000. Negative = early, positive = late.
  * 5. Accuracy (ratio-based): beat_ms = 60000 / BPM, error_ratio = |offsetMs| / beat_ms.
  *    error_ratio <= PERFECT_RATIO → "perfect"; <= GOOD_RATIO → "good" (Great); else "miss".
@@ -88,17 +88,17 @@ export const ASSIGNMENT_WINDOW_MS = 150;
  * @param tapTimes - Array of tap times in AudioContext seconds (same clock as expectedTimes).
  * @param expectedTimes - Array of expected hit times from the note scheduler.
  * @param thresholds - Optional. Perfect and good bands in ms; defaults to DEFAULT_THRESHOLDS.
- * @param latencyCompensationMs - Optional. User setting (0–80); defaults to LATENCY_COMPENSATION_MS.
+ * @param auditoryCompensationMs - Optional. User's auditory delay compensation (0–80 ms); defaults to LATENCY_COMPENSATION_MS.
  * @returns One HitResult per expected note. Taps are matched to the closest expected within ASSIGNMENT_WINDOW_MS.
  */
 export function scoreSession(
   tapTimes: number[],
   expectedTimes: number[],
   thresholds: ScoringThresholds = DEFAULT_THRESHOLDS,
-  latencyCompensationMs: number = LATENCY_COMPENSATION_MS
+  auditoryCompensationMs: number = LATENCY_COMPENSATION_MS
 ): HitResult[] {
   const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
-  const compSec = latencySec(latencyCompensationMs);
+  const compSec = latencySec(auditoryCompensationMs);
 
   type Pair = { tapIdx: number; expectedIdx: number; distanceMs: number };
   const pairs: Pair[] = [];

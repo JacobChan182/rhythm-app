@@ -55,6 +55,10 @@ export default function Practice() {
       lastFeedbackAccuracy={practice.lastFeedbackAccuracy}
       summaryResults={practice.summaryResults}
       counts={practice.counts}
+      auditoryCompensationMs={practice.auditoryCompensationMs}
+      visualCompensationMs={practice.visualCompensationMs}
+      onAuditoryCompensationChange={practice.onAuditoryCompensationChange}
+      onVisualCompensationChange={practice.onVisualCompensationChange}
     />
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Platform, Animated } from "react-native";
+import Slider from "@react-native-community/slider";
 import type { HitResult } from "@/lib/scoring";
 import type { Rudiment } from "@/types/rudiment";
 import type { MetronomeSoundId } from "@/lib/metronome";
@@ -34,7 +35,14 @@ type PracticeScreenProps = {
   lastFeedbackAccuracy: "perfect" | "good" | "miss" | null;
   summaryResults: HitResult[] | null;
   counts: { perfect: number; good: number; miss: number } | null;
+  auditoryCompensationMs: number;
+  visualCompensationMs: number;
+  onAuditoryCompensationChange: (ms: number) => void;
+  onVisualCompensationChange: (ms: number) => void;
 };
+
+const COMPENSATION_MIN_MS = 0;
+const COMPENSATION_MAX_MS = 80;
 
 export function PracticeScreen({
   phase,
@@ -61,6 +69,10 @@ export function PracticeScreen({
   liveResults,
   lastFeedbackAccuracy: hitFeedback,
   counts,
+  auditoryCompensationMs,
+  visualCompensationMs,
+  onAuditoryCompensationChange,
+  onVisualCompensationChange,
 }: PracticeScreenProps) {
   const [soundPickerOpen, setSoundPickerOpen] = useState(false);
   const nameFadeOpacity = useRef(new Animated.Value(1)).current;
@@ -176,12 +188,15 @@ export function PracticeScreen({
             tapFlashHand === "R" && styles.tapAreaFlashR,
           ]}
           onPress={onTapRight}
-          onContextMenu={(e) => {
-            const ev = (e as unknown as { nativeEvent?: { preventDefault?: () => void } })
-              .nativeEvent;
-            if (ev?.preventDefault) ev.preventDefault();
-            onTapRight();
-          }}
+          {...(Platform.OS === "web"
+            ? {
+                onContextMenu: (e: unknown) => {
+                  const ev = (e as { nativeEvent?: { preventDefault?: () => void } }).nativeEvent;
+                  if (ev?.preventDefault) ev.preventDefault();
+                  onTapRight();
+                },
+              }
+            : {})}
           activeOpacity={1}
         >
           <Text style={styles.tapLabel}>R</Text>
@@ -190,90 +205,18 @@ export function PracticeScreen({
       </View>
       <Text style={styles.tapCount}>{tapCount} taps</Text>
 
-      {isWeb && (
+      <View style={styles.controlsRow}>
         <View style={styles.controls}>
-          <Text style={styles.label}>Sound</Text>
-          {Platform.OS === "web" ? (
-            <select
-              value={sound}
-              onChange={(e) =>
-                onSoundChange((e.target as HTMLSelectElement).value as MetronomeSoundId)
-              }
-              style={styles.soundSelect as unknown as React.CSSProperties}
-              disabled={running}
-            >
-              {METRONOME_SOUND_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={styles.soundTouchable}
-                onPress={() => setSoundPickerOpen(true)}
-                disabled={running}
-              >
-                <Text style={styles.soundTouchableText}>{currentPreset.label}</Text>
-              </TouchableOpacity>
-              <Modal
-                visible={soundPickerOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setSoundPickerOpen(false)}
-              >
-                <TouchableOpacity
-                  style={styles.soundModalBackdrop}
-                  activeOpacity={1}
-                  onPress={() => setSoundPickerOpen(false)}
-                >
-                  <View style={styles.soundModalContent}>
-                    <ScrollView
-                      style={styles.soundModalScroll}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {METRONOME_SOUND_PRESETS.map((preset) => (
-                      <TouchableOpacity
-                        key={preset.id}
-                        style={[
-                          styles.soundModalOption,
-                          sound === preset.id && styles.soundModalOptionActive,
-                        ]}
-                        onPress={() => {
-                          onSoundChange(preset.id);
-                          setSoundPickerOpen(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.soundModalOptionText,
-                            sound === preset.id && styles.soundModalOptionTextActive,
-                          ]}
-                        >
-                          {preset.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    </ScrollView>
-                  </View>
-                </TouchableOpacity>
-              </Modal>
-            </>
-          )}
+          <Text style={styles.label}>BPM</Text>
+          <TextInput
+            style={styles.input}
+            value={bpmInput}
+            onChangeText={onBpmChange}
+            keyboardType="number-pad"
+            editable={!running}
+            maxLength={3}
+          />
         </View>
-      )}
-
-      <View style={styles.controls}>
-        <Text style={styles.label}>BPM</Text>
-        <TextInput
-          style={styles.input}
-          value={bpmInput}
-          onChangeText={onBpmChange}
-          keyboardType="number-pad"
-          editable={!running}
-          maxLength={3}
-        />
         {phase === "exercising" ? (
           <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
             <Text style={styles.buttonText}>Stop</Text>
@@ -288,6 +231,111 @@ export function PracticeScreen({
             </Text>
           </TouchableOpacity>
         )}
+        {isWeb && (
+          <View style={styles.controls}>
+            <Text style={styles.label}>Sound</Text>
+            {Platform.OS === "web" ? (
+              <select
+                value={sound}
+                onChange={(e) =>
+                  onSoundChange((e.target as HTMLSelectElement).value as MetronomeSoundId)
+                }
+                style={styles.soundSelect as unknown as React.CSSProperties}
+                disabled={running}
+              >
+                {METRONOME_SOUND_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.soundTouchable}
+                  onPress={() => setSoundPickerOpen(true)}
+                  disabled={running}
+                >
+                  <Text style={styles.soundTouchableText}>{currentPreset.label}</Text>
+                </TouchableOpacity>
+                <Modal
+                  visible={soundPickerOpen}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setSoundPickerOpen(false)}
+                >
+                  <TouchableOpacity
+                    style={styles.soundModalBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setSoundPickerOpen(false)}
+                  >
+                    <View style={styles.soundModalContent}>
+                      <ScrollView
+                        style={styles.soundModalScroll}
+                        keyboardShouldPersistTaps="handled"
+                      >
+                        {METRONOME_SOUND_PRESETS.map((preset) => (
+                        <TouchableOpacity
+                          key={preset.id}
+                          style={[
+                            styles.soundModalOption,
+                            sound === preset.id && styles.soundModalOptionActive,
+                          ]}
+                          onPress={() => {
+                            onSoundChange(preset.id);
+                            setSoundPickerOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.soundModalOptionText,
+                              sound === preset.id && styles.soundModalOptionTextActive,
+                            ]}
+                          >
+                            {preset.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      </ScrollView>
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              </>
+            )}
+          </View>
+        )}
+        <View style={styles.sliderColumn}>
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>Auditory</Text>
+            <Text style={styles.sliderValue}>{auditoryCompensationMs} ms</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={COMPENSATION_MIN_MS}
+              maximumValue={COMPENSATION_MAX_MS}
+              step={5}
+              value={auditoryCompensationMs}
+              onValueChange={onAuditoryCompensationChange}
+              minimumTrackTintColor="#22c55e"
+              maximumTrackTintColor="#333"
+              thumbTintColor="#22c55e"
+            />
+          </View>
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>Visual</Text>
+            <Text style={styles.sliderValue}>{visualCompensationMs} ms</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={COMPENSATION_MIN_MS}
+              maximumValue={COMPENSATION_MAX_MS}
+              step={5}
+              value={visualCompensationMs}
+              onValueChange={onVisualCompensationChange}
+              minimumTrackTintColor="#22c55e"
+              maximumTrackTintColor="#333"
+              thumbTintColor="#22c55e"
+            />
+          </View>
+        </View>
       </View>
 
       {showSummary && counts && (
@@ -545,10 +593,16 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "600",
   },
+  controlsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 24,
+  },
   controls: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
   },
   label: {
     color: "#888",
@@ -579,6 +633,30 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "600",
+  },
+  sliderColumn: {
+    flexDirection: "column",
+    gap: 4,
+    minWidth: 180,
+  },
+  sliderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: "#888",
+    width: 52,
+  },
+  sliderValue: {
+    fontSize: 12,
+    color: "#fff",
+    width: 36,
+  },
+  slider: {
+    width: 100,
+    height: 32,
   },
   summary: {
     marginTop: 16,

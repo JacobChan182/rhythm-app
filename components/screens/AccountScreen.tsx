@@ -1,12 +1,6 @@
-import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import Slider from "@react-native-community/slider";
 import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
 import type { User } from "firebase/auth";
-import { getUserProgress, saveLatencyCompensation, getDefaultLatencyCompensationMs, RECOMMENDED_LATENCY_COMPENSATION_MS } from "@/lib/userProgress";
-
-const MIN_LATENCY_MS = 0;
-const MAX_LATENCY_MS = 80;
 
 type AccountScreenProps = {
   user: User | null;
@@ -15,25 +9,6 @@ type AccountScreenProps = {
 
 export function AccountScreen({ user, onSignOut }: AccountScreenProps) {
   const displayName = user?.displayName ?? user?.email ?? "Signed in";
-  const [latencyMs, setLatencyMs] = useState(RECOMMENDED_LATENCY_COMPENSATION_MS);
-  const [latencyLoaded, setLatencyLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    getUserProgress(user).then((progress) => {
-      if (cancelled) return;
-      setLatencyMs(getDefaultLatencyCompensationMs(progress));
-      setLatencyLoaded(true);
-    });
-    return () => { cancelled = true; };
-  }, [user]);
-
-  const handleLatencyChange = (value: number) => {
-    const ms = Math.round(value);
-    setLatencyMs(ms);
-    if (user) saveLatencyCompensation(user, ms);
-  };
 
   return (
     <View style={styles.container}>
@@ -49,29 +24,6 @@ export function AccountScreen({ user, onSignOut }: AccountScreenProps) {
           </Text>
         ) : null}
       </View>
-
-      {user && (
-        <View style={styles.card}>
-          <Text style={styles.label}>Latency compensation</Text>
-          <Text style={styles.sliderHint}>
-            Compensates for audio/display delay. Recommended: {RECOMMENDED_LATENCY_COMPENSATION_MS} ms
-          </Text>
-          <View style={styles.sliderRow}>
-            <Text style={styles.sliderValue}>{latencyLoaded ? latencyMs : "—"} ms</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={MIN_LATENCY_MS}
-              maximumValue={MAX_LATENCY_MS}
-              step={5}
-              value={latencyMs}
-              onValueChange={handleLatencyChange}
-              minimumTrackTintColor="#22c55e"
-              maximumTrackTintColor="#333"
-              thumbTintColor="#22c55e"
-            />
-          </View>
-        </View>
-      )}
 
       <TouchableOpacity style={styles.signOutButton} onPress={onSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>
@@ -113,26 +65,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginTop: 4,
-  },
-  sliderHint: {
-    fontSize: 12,
-    color: "#888",
-    marginBottom: 8,
-  },
-  sliderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  sliderValue: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-    minWidth: 40,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
   },
   signOutButton: {
     paddingVertical: 14,

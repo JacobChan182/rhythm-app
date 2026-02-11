@@ -12,17 +12,22 @@ export type UserProgress = {
   updatedAt: string; // ISO
   username?: string;
   email?: string;
-  /** Latency compensation in ms (0–80). Recommended 15. */
+  /** @deprecated Use auditoryCompensationMs / visualCompensationMs. */
   latencyCompensationMs?: number;
+  /** Auditory delay compensation in ms (0–80). Recommended 15. */
+  auditoryCompensationMs?: number;
+  /** Visual delay compensation in ms (0–80). Recommended 15. */
+  visualCompensationMs?: number;
 };
 
 const COLLECTION = "users";
 const USERNAMES_COLLECTION = "usernames";
 const DEFAULT_BPM = 120;
-/** Recommended default for latency compensation (ms). */
-export const RECOMMENDED_LATENCY_COMPENSATION_MS = 15;
-const MIN_LATENCY_MS = 0;
-const MAX_LATENCY_MS = 80;
+/** Recommended default for delay compensation (ms). */
+export const RECOMMENDED_AUDITORY_MS = 15;
+export const RECOMMENDED_VISUAL_MS = 15;
+const MIN_COMPENSATION_MS = 0;
+const MAX_COMPENSATION_MS = 80;
 
 /** Normalize for case-insensitive uniqueness (e.g. "CoolUser" and "cooluser" are the same). */
 export function normalizeUsername(s: string): string {
@@ -133,21 +138,55 @@ export function getDefaultBpm(progress: UserProgress | null): number {
   return Math.max(40, Math.min(240, progress.lastBpm));
 }
 
-export function getDefaultLatencyCompensationMs(progress: UserProgress | null): number {
-  if (!progress || typeof progress.latencyCompensationMs !== "number")
-    return RECOMMENDED_LATENCY_COMPENSATION_MS;
-  return Math.max(MIN_LATENCY_MS, Math.min(MAX_LATENCY_MS, progress.latencyCompensationMs));
+function clampCompensation(ms: number): number {
+  return Math.max(MIN_COMPENSATION_MS, Math.min(MAX_COMPENSATION_MS, Math.round(ms)));
 }
 
-export async function saveLatencyCompensation(user: User, ms: number): Promise<void> {
+/** Auditory: used when scoring taps (shifts tap time earlier). Fallback: old latencyCompensationMs or recommended. */
+export function getDefaultAuditoryCompensationMs(progress: UserProgress | null): number {
+  if (!progress) return RECOMMENDED_AUDITORY_MS;
+  if (typeof progress.auditoryCompensationMs === "number")
+    return clampCompensation(progress.auditoryCompensationMs);
+  if (typeof progress.latencyCompensationMs === "number")
+    return clampCompensation(progress.latencyCompensationMs);
+  return RECOMMENDED_AUDITORY_MS;
+}
+
+/** Visual: used for miss feedback delay (how long to wait before showing Miss). Fallback: old latencyCompensationMs or recommended. */
+export function getDefaultVisualCompensationMs(progress: UserProgress | null): number {
+  if (!progress) return RECOMMENDED_VISUAL_MS;
+  if (typeof progress.visualCompensationMs === "number")
+    return clampCompensation(progress.visualCompensationMs);
+  if (typeof progress.latencyCompensationMs === "number")
+    return clampCompensation(progress.latencyCompensationMs);
+  return RECOMMENDED_VISUAL_MS;
+}
+
+export async function saveAuditoryCompensation(user: User, ms: number): Promise<void> {
   try {
     const db = getFirebaseDb();
     const ref = doc(db, COLLECTION, user.uid);
-    const clamped = Math.max(MIN_LATENCY_MS, Math.min(MAX_LATENCY_MS, Math.round(ms)));
     await setDoc(
       ref,
       {
-        latencyCompensationMs: clamped,
+        auditoryCompensationMs: clampCompensation(ms),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch {
+    // Non-blocking
+  }
+}
+
+export async function saveVisualCompensation(user: User, ms: number): Promise<void> {
+  try {
+    const db = getFirebaseDb();
+    const ref = doc(db, COLLECTION, user.uid);
+    await setDoc(
+      ref,
+      {
+        visualCompensationMs: clampCompensation(ms),
         updatedAt: new Date().toISOString(),
       },
       { merge: true }
