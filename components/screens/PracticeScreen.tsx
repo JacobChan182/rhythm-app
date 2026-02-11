@@ -455,6 +455,7 @@ const styles = StyleSheet.create({
   },
   trackContainer: {
     position: "relative",
+    minHeight: 112,
     marginBottom: 20,
   },
   trackPlaceholderWrapper: {

@@ -12,11 +12,17 @@ export type UserProgress = {
   updatedAt: string; // ISO
   username?: string;
   email?: string;
+  /** Latency compensation in ms (0–80). Recommended 15. */
+  latencyCompensationMs?: number;
 };
 
 const COLLECTION = "users";
 const USERNAMES_COLLECTION = "usernames";
 const DEFAULT_BPM = 120;
+/** Recommended default for latency compensation (ms). */
+export const RECOMMENDED_LATENCY_COMPENSATION_MS = 15;
+const MIN_LATENCY_MS = 0;
+const MAX_LATENCY_MS = 80;
 
 /** Normalize for case-insensitive uniqueness (e.g. "CoolUser" and "cooluser" are the same). */
 export function normalizeUsername(s: string): string {
@@ -125,4 +131,28 @@ export async function saveUserProfile(
 export function getDefaultBpm(progress: UserProgress | null): number {
   if (!progress || typeof progress.lastBpm !== "number") return DEFAULT_BPM;
   return Math.max(40, Math.min(240, progress.lastBpm));
+}
+
+export function getDefaultLatencyCompensationMs(progress: UserProgress | null): number {
+  if (!progress || typeof progress.latencyCompensationMs !== "number")
+    return RECOMMENDED_LATENCY_COMPENSATION_MS;
+  return Math.max(MIN_LATENCY_MS, Math.min(MAX_LATENCY_MS, progress.latencyCompensationMs));
+}
+
+export async function saveLatencyCompensation(user: User, ms: number): Promise<void> {
+  try {
+    const db = getFirebaseDb();
+    const ref = doc(db, COLLECTION, user.uid);
+    const clamped = Math.max(MIN_LATENCY_MS, Math.min(MAX_LATENCY_MS, Math.round(ms)));
+    await setDoc(
+      ref,
+      {
+        latencyCompensationMs: clamped,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch {
+    // Non-blocking
+  }
 }

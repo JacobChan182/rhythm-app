@@ -15,9 +15,12 @@
  *    Expected notes with no assigned tap → "miss".
  */
 
-/** Buffer (ms) to compensate for average audio output, display, and input latency. Applied so taps are scored as if they occurred this much earlier. */
+/** Default buffer (ms) when user has not set a value. Recommended is 15. */
 export const LATENCY_COMPENSATION_MS = 15;
-const LATENCY_COMPENSATION_SEC = LATENCY_COMPENSATION_MS / 1000;
+
+function latencySec(ms: number): number {
+  return ms / 1000;
+}
 
 export type HitAccuracy = "perfect" | "good" | "miss";
 
@@ -85,20 +88,23 @@ export const ASSIGNMENT_WINDOW_MS = 150;
  * @param tapTimes - Array of tap times in AudioContext seconds (same clock as expectedTimes).
  * @param expectedTimes - Array of expected hit times from the note scheduler.
  * @param thresholds - Optional. Perfect and good bands in ms; defaults to DEFAULT_THRESHOLDS.
+ * @param latencyCompensationMs - Optional. User setting (0–80); defaults to LATENCY_COMPENSATION_MS.
  * @returns One HitResult per expected note. Taps are matched to the closest expected within ASSIGNMENT_WINDOW_MS.
  */
 export function scoreSession(
   tapTimes: number[],
   expectedTimes: number[],
-  thresholds: ScoringThresholds = DEFAULT_THRESHOLDS
+  thresholds: ScoringThresholds = DEFAULT_THRESHOLDS,
+  latencyCompensationMs: number = LATENCY_COMPENSATION_MS
 ): HitResult[] {
   const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
+  const compSec = latencySec(latencyCompensationMs);
 
   type Pair = { tapIdx: number; expectedIdx: number; distanceMs: number };
   const pairs: Pair[] = [];
 
   for (let t = 0; t < tapTimes.length; t++) {
-    const effectiveTapTime = tapTimes[t] - LATENCY_COMPENSATION_SEC;
+    const effectiveTapTime = tapTimes[t] - compSec;
     for (let e = 0; e < expectedTimes.length; e++) {
       const expectedTime = expectedTimes[e];
       const distanceSec = Math.abs(effectiveTapTime - expectedTime);
@@ -138,7 +144,7 @@ export function scoreSession(
       continue;
     }
 
-    const effectiveTapTime = tapTime - LATENCY_COMPENSATION_SEC;
+    const effectiveTapTime = tapTime - compSec;
     const offsetMs = (effectiveTapTime - expectedTime) * 1000;
     const accuracy = classifyOffset(offsetMs, thresholds);
 

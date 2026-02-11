@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useTapCapture } from "@/hooks/useTapCapture";
 import type { User } from "firebase/auth";
-import { getUserProgress, saveLastBpm, getDefaultBpm } from "@/lib/userProgress";
+import { getUserProgress, saveLastBpm, getDefaultBpm, getDefaultLatencyCompensationMs } from "@/lib/userProgress";
 import { getAudioContextTime, getMetronomeFirstBeatTime } from "@/lib/metronome";
 import {
   getExpectedHitTimesForRudiment,
@@ -88,6 +88,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const tapCapture = useTapCapture();
   const [bpmInput, setBpmInput] = useState(String(defaultBpm));
   const [progressLoaded, setProgressLoaded] = useState(initialBpm != null);
+  const latencyCompensationMsRef = useRef(LATENCY_COMPENSATION_MS);
 
   useEffect(() => {
     if (!user || progressLoaded) return;
@@ -97,6 +98,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       const bpm = getDefaultBpm(progress);
       metronome.setBpm(bpm);
       setBpmInput(String(bpm));
+      latencyCompensationMsRef.current = getDefaultLatencyCompensationMs(progress);
       setProgressLoaded(true);
     });
     return () => {
@@ -192,7 +194,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       rudiment
     );
     const thresholds = getThresholdsForBpm(bpmRef.current);
-    const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds);
+    const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds, latencyCompensationMsRef.current);
     results.forEach((r, i) => {
       if (r.offsetMs != null) {
         const sign = r.offsetMs >= 0 ? "+" : "";
@@ -225,7 +227,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         if (hitToShow == null && expectedTimesThisCycle.length > 0) {
           let bestOffsetMs = Infinity;
           for (const expectedTime of expectedTimesThisCycle) {
-            const offsetMs = (newestTapTime - expectedTime) * 1000 - LATENCY_COMPENSATION_MS;
+            const offsetMs = (newestTapTime - expectedTime) * 1000 - latencyCompensationMsRef.current;
             if (Math.abs(offsetMs) < Math.abs(bestOffsetMs)) bestOffsetMs = offsetMs;
           }
           if (Math.abs(bestOffsetMs) <= thresholds.goodThresholdMs) {
@@ -271,7 +273,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       const beatMs = 60000 / bpm;
       const beatSec = 60 / bpm;
       const missWindowSec = (MISS_WINDOW_RATIO * beatMs) / 1000;
-      const latencyBufferSec = LATENCY_COMPENSATION_MS / 1000;
+      const latencyBufferSec = latencyCompensationMsRef.current / 1000;
       const missCooldownSec = MISS_COOLDOWN_AFTER_HIT_BEATS * beatSec;
       const expectedTimesThisCycle = getExpectedHitTimesForRudiment(
         cycleStart,
@@ -292,7 +294,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         .sort((a, b) => a.time - b.time)
         .map((t) => t.time);
       const thresholds = getThresholdsForBpm(bpm);
-      const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds);
+      const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds, latencyCompensationMsRef.current);
       const signature = results.map((r) => r.accuracy).join(",");
       if (lastLiveResultsSignatureRef.current !== signature) {
         lastLiveResultsSignatureRef.current = signature;
@@ -363,6 +365,11 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       });
     };
 
+    if (user) {
+      const progress = await getUserProgress(user);
+      if (progress) latencyCompensationMsRef.current = getDefaultLatencyCompensationMs(progress);
+    }
+
     await metronome.start();
     const firstBeat = getMetronomeFirstBeatTime();
     sessionStartTimeRef.current = firstBeat > 0 ? firstBeat : getAudioContextTime();
@@ -410,7 +417,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         Math.max(cyclesPlayed, 1)
       );
       const thresholds = getThresholdsForBpm(metronome.bpm);
-      results = scoreSession(tapTimes, expectedAll, thresholds);
+      results = scoreSession(tapTimes, expectedAll, thresholds, latencyCompensationMsRef.current);
     }
     setSummaryResults(results);
     setPhase("summary");

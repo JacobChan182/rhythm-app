@@ -10,6 +10,7 @@
     "build": "expo export -p web"
   },
   "dependencies": {
+    "@react-native-community/slider": "4.5.5",
     "expo": "~52.0.0",
     "expo-blur": "~14.0.3",
     "expo-linear-gradient": "~14.0.2",

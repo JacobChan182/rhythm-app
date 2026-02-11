@@ -195,7 +195,6 @@ export function SlidingNoteLane({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 20,
     height: 112,
   },
   wrapperFullWidth: {
