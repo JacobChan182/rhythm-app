@@ -5,8 +5,8 @@ import type { PatternCell } from "@/types/rudiment";
 
 /** How many seconds before a note's hit time it enters the track (from the right). */
 const APPROACH_SEC = 5;
-/** How often we update which notes are in the visible window (ms). Reduces mount churn. */
-const VISIBILITY_UPDATE_MS = 250;
+/** How often we update which notes are in the visible window (ms). Higher = fewer re-renders and less bar jitter. */
+const VISIBILITY_UPDATE_MS = 500;
 
 type SlidingNoteLaneProps = {
   expectedTimes: number[];
@@ -103,6 +103,52 @@ export function SlidingNoteLane({
     };
   }, []);
 
+  const hitZoneX = 0.2 * laneWidth;
+  const startX = laneWidth;
+
+  const visibleNotes = useMemo(
+    () =>
+      notes.filter(
+        (note) =>
+          note.time >= visibleWindowStart - 0.5 &&
+          note.time <= visibleWindowStart + APPROACH_SEC + 2
+      ),
+    [notes, visibleWindowStart]
+  );
+
+  const slidingBars = useMemo(() => {
+    const leftEnd = Math.max(0, startX - BAR_WRAPPER_WIDTH / 2);
+    const leftHit = Math.max(0, hitZoneX - BAR_WRAPPER_WIDTH / 2);
+    return visibleNotes.map((note) => {
+      const tMin = note.time - APPROACH_SEC;
+      const tHit = note.time;
+      const leftAnim = nowVal.interpolate({
+        inputRange: [tMin, tHit],
+        outputRange: [leftEnd, leftHit],
+        extrapolate: "clamp",
+      });
+      const opacityAnim = nowVal.interpolate({
+        inputRange: [tHit - 0.05, tHit, tHit + 0.15],
+        outputRange: [1, 1, 0.4],
+        extrapolate: "clamp",
+      });
+      return (
+        <Animated.View
+          key={note.time}
+          style={[styles.barWrapper, { left: leftAnim, opacity: opacityAnim }]}
+        >
+          <View
+            style={[
+              styles.bar,
+              note.hand === "L" ? styles.barL : styles.barR,
+            ]}
+          />
+          <Text style={styles.handLabel}>{note.hand}</Text>
+        </Animated.View>
+      );
+    });
+  }, [visibleNotes, hitZoneX, startX, nowVal]);
+
   if (notes.length === 0) return null;
   if (laneWidth <= 0) {
     return (
@@ -112,15 +158,6 @@ export function SlidingNoteLane({
       />
     );
   }
-
-  const hitZoneX = 0.2 * laneWidth;
-  const startX = laneWidth;
-
-  const visibleNotes = notes.filter(
-    (note) =>
-      note.time >= visibleWindowStart - 0.5 &&
-      note.time <= visibleWindowStart + APPROACH_SEC + 2
-  );
 
   return (
     <View
@@ -150,37 +187,7 @@ export function SlidingNoteLane({
           </View>
         )}
         <View style={[styles.hitZone, { left: hitZoneX }]} />
-        {visibleNotes.map((note) => {
-          const tMin = note.time - APPROACH_SEC;
-          const tHit = note.time;
-          const leftAnim = nowVal.interpolate({
-            inputRange: [tMin, tHit],
-            outputRange: [
-              Math.max(0, startX - BAR_WRAPPER_WIDTH / 2),
-              Math.max(0, hitZoneX - BAR_WRAPPER_WIDTH / 2),
-            ],
-            extrapolate: "clamp",
-          });
-          const opacityAnim = nowVal.interpolate({
-            inputRange: [tHit - 0.05, tHit, tHit + 0.15],
-            outputRange: [1, 1, 0.4],
-            extrapolate: "clamp",
-          });
-          return (
-            <Animated.View
-              key={note.time}
-              style={[styles.barWrapper, { left: leftAnim, opacity: opacityAnim }]}
-            >
-              <View
-                style={[
-                  styles.bar,
-                  note.hand === "L" ? styles.barL : styles.barR,
-                ]}
-              />
-              <Text style={styles.handLabel}>{note.hand}</Text>
-            </Animated.View>
-          );
-        })}
+        {slidingBars}
       </View>
     </View>
   );

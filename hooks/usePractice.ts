@@ -64,6 +64,8 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const lastShownTapCountRef = useRef(0);
   /** AudioContext time when we last showed Perfect/Great; don't show Miss for a short period after. */
   const lastHitFeedbackTimeRef = useRef(0);
+  /** Avoid setLiveResults when unchanged so we don't re-render SlidingNoteLane every 80ms (causes bar jitter). */
+  const lastLiveResultsSignatureRef = useRef<string>("");
 
   const onBeatRef = useRef<((beat: number) => void) | null>(null);
   const sessionStartTimeRef = useRef<number>(0);
@@ -74,6 +76,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const rafRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const currentCycleIndexRef = useRef(0);
+  const lastBeatInCycleRef = useRef<number>(-1);
   const [currentBeatInCycle, setCurrentBeatInCycle] = useState(-1);
 
   const defaultBpm = initialBpm ?? 120;
@@ -121,17 +124,28 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
-      // Same clock as audio: count-in and exercise beat from AudioContext time
+      // Same clock as audio: count-in and exercise beat from AudioContext time.
+      // Only update state when beat/cycle actually changes so we don't re-render 60fps (causes bar jitter).
       if (now < start) {
         const countInBeat = Math.floor((now - sessionStart) / beatDuration) % 4;
-        setCurrentBeatInCycle(countInBeat >= 0 ? countInBeat : 0);
+        const beat = countInBeat >= 0 ? countInBeat : 0;
+        if (lastBeatInCycleRef.current !== beat) {
+          lastBeatInCycleRef.current = beat;
+          setCurrentBeatInCycle(beat);
+        }
       } else {
         const cycleIndex = Math.floor((now - start) / cycleDur);
-        setCurrentCycleIndex((prev) => (cycleIndex > prev ? cycleIndex : prev));
+        if (cycleIndex > currentCycleIndexRef.current) {
+          currentCycleIndexRef.current = cycleIndex;
+          setCurrentCycleIndex(cycleIndex);
+        }
         const cycleStart = start + cycleIndex * cycleDur;
         const elapsedInCycle = now - cycleStart;
         const beatInCycle = Math.floor(elapsedInCycle / beatDuration) % 4;
-        setCurrentBeatInCycle(beatInCycle);
+        if (lastBeatInCycleRef.current !== beatInCycle) {
+          lastBeatInCycleRef.current = beatInCycle;
+          setCurrentBeatInCycle(beatInCycle);
+        }
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -160,8 +174,11 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     const cycleStart = start + currentCycleIndex * cycleDur;
     const cycleEnd = cycleStart + cycleDur;
     const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
-    // Include taps slightly after cycleEnd so late hits on the last note still get feedback
-    const tapsInCycle = tapCapture.taps
+    // Only scan recent taps so work stays O(1) as session length grows (avoids FPS drop)
+    const taps = tapCapture.taps;
+    const recentCap = Math.max(64, notesPerCycle * 4);
+    const recentTaps = taps.length <= recentCap ? taps : taps.slice(-recentCap);
+    const tapsInCycle = recentTaps
       .filter(
         (t) =>
           t.time >= cycleStart - assignmentWindowSec &&
@@ -262,7 +279,10 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       );
       const assignmentWindowSec = ASSIGNMENT_WINDOW_MS / 1000;
       const cycleEnd = cycleStart + cycleDur;
-      const tapsInCycle = tapCapture.taps
+      const taps = tapCapture.taps;
+      const recentCap = Math.max(64, notesPerCycle * 4);
+      const recentTaps = taps.length <= recentCap ? taps : taps.slice(-recentCap);
+      const tapsInCycle = recentTaps
         .filter(
           (t) =>
             t.time >= cycleStart - assignmentWindowSec &&
@@ -272,7 +292,11 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
         .map((t) => t.time);
       const thresholds = getThresholdsForBpm(bpm);
       const results = scoreSession(tapsInCycle, expectedTimesThisCycle, thresholds);
-      setLiveResults(results);
+      const signature = results.map((r) => r.accuracy).join(",");
+      if (lastLiveResultsSignatureRef.current !== signature) {
+        lastLiveResultsSignatureRef.current = signature;
+        setLiveResults(results);
+      }
       const recentlyShowedHit = now - lastHitFeedbackTimeRef.current < missCooldownSec;
       for (let i = 0; i < expectedTimesThisCycle.length; i++) {
         const beatTime = expectedTimesThisCycle[i];
@@ -305,6 +329,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
       setExpectedTimes([]);
       setExpectedTimesExtended([]);
       setCurrentCycleIndex(0);
+      lastBeatInCycleRef.current = -1;
       setCurrentBeatInCycle(-1);
       setLiveResults([]);
       setCountInBeatsSeen(0);
@@ -322,6 +347,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     setExpectedTimes([]);
     setExpectedTimesExtended([]);
     setCurrentCycleIndex(0);
+    lastBeatInCycleRef.current = -1;
     setCurrentBeatInCycle(-1);
     setCountInBeatsSeen(0);
 
@@ -412,6 +438,7 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
     setExpectedTimes([]);
     setExpectedTimesExtended([]);
     setCurrentCycleIndex(0);
+    lastBeatInCycleRef.current = -1;
     setCurrentBeatInCycle(-1);
     setLiveResults([]);
     setCountInBeatsSeen(0);

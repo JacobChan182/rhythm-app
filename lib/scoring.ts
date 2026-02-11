@@ -40,8 +40,8 @@ export const DEFAULT_THRESHOLDS: ScoringThresholds = {
   goodThresholdMs: 100,
 };
 
-const PERFECT_RATIO = 0.02;
-const GOOD_RATIO = 0.05;
+const PERFECT_RATIO = 0.03;
+const GOOD_RATIO = 0.07;
 
 /**
  * Compute thresholds in ms from BPM using error ratio:
