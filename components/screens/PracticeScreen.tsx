@@ -121,16 +121,14 @@ export function PracticeScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Practice</Text>
-      <Text style={styles.subtitle}>
-        {rudiment ? rudiment.name : "—"} • Play with the metronome
-      </Text>
-      {!isWeb && (
-        <Text style={styles.warn}>Metronome is web-only in this MVP.</Text>
-      )}
-
-      {rudiment && isWeb && (
-        <>
+      <View style={styles.titleBeatRow}>
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Practice</Text>
+          <Text style={styles.subtitle}>
+            {rudiment ? rudiment.name : "—"} • Play with the metronome
+          </Text>
+        </View>
+        {rudiment && isWeb && (
           <View style={styles.beatRow}>
             {[0, 1, 2, 3].map((i) => {
               // Beat from same AudioContext time as metronome and scoring (no separate count-in phase).
@@ -157,6 +155,14 @@ export function PracticeScreen({
               );
             })}
           </View>
+        )}
+      </View>
+      {!isWeb && (
+        <Text style={styles.warn}>Metronome is web-only in this MVP.</Text>
+      )}
+
+      {rudiment && isWeb && (
+        <>
           <View style={styles.trackContainer}>
             {phase === "exercising" &&
             expectedTimesExtended.length > 0 ? (
@@ -229,37 +235,13 @@ export function PracticeScreen({
       <Text style={styles.tapCount}>{tapCount} taps</Text>
 
       <View style={styles.settingsRow}>
-        <View style={styles.controlsColumn}>
-        <View style={styles.controlsRow}>
-          <View style={styles.controls}>
-            <Text style={styles.label}>BPM</Text>
-            <TextInput
-              style={styles.input}
-              value={bpmInput}
-              onChangeText={onBpmChange}
-              keyboardType="number-pad"
-              editable={!running}
-              maxLength={3}
-            />
-          </View>
-          {phase === "exercising" ? (
-            <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
-              <Text style={styles.buttonText}>Stop</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.button, running ? styles.buttonStop : styles.buttonStart]}
-              onPress={onStartStop}
-            >
-              <Text style={styles.buttonText}>
-                {running ? "Stop" : "Start"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {isWeb && (
-          <View style={styles.controls}>
-            <Text style={styles.label}>Sound</Text>
+        <View style={styles.settingsGrid}>
+          {/* Row 1: Sound | Auditory */}
+          <View style={styles.settingsLine}>
+            <View style={[styles.settingsBlock, styles.settingsCell]}>
+            {isWeb ? (
+              <View style={styles.controls}>
+                <Text style={styles.settingsLabel}>Sound</Text>
             {Platform.OS === "web" ? (
               <select
                 value={sound}
@@ -329,84 +311,118 @@ export function PracticeScreen({
               </>
             )}
           </View>
+            ) : (
+              <View style={styles.controls} />
+            )}
+            </View>
+            <View style={[styles.settingsBlock, styles.settingsCell]}>
+              <View style={styles.sliderRow}>
+                <Text style={styles.settingsLabel}>Auditory</Text>
+                <TextInput
+                  style={styles.compensationInput}
+                  value={auditoryInputStr ?? String(auditoryCompensationMs)}
+                  onChangeText={setAuditoryInputStr}
+                  onFocus={() => setAuditoryInputStr(String(auditoryCompensationMs))}
+                  onBlur={() => auditoryInputStr !== null && commitAuditory(auditoryInputStr)}
+                  onEndEditing={(e) => commitAuditory(e.nativeEvent.text)}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                />
+                <Text style={styles.sliderUnit}>ms</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={COMPENSATION_MIN_MS}
+                  maximumValue={SLIDER_MAX_MS}
+                  step={5}
+                  value={Math.min(auditoryCompensationMs, SLIDER_MAX_MS)}
+                  onValueChange={onAuditoryCompensationChange}
+                  minimumTrackTintColor="#22c55e"
+                  maximumTrackTintColor="#333"
+                  thumbTintColor="#22c55e"
+                />
+              </View>
+            </View>
+          </View>
+          {/* Row 2: BPM | Visual */}
+          <View style={styles.settingsLine}>
+            <View style={[styles.settingsBlock, styles.settingsCell]}>
+              <View style={styles.controlsRow}>
+                <View style={styles.controls}>
+                  <Text style={styles.settingsLabel}>BPM</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={bpmInput}
+                    onChangeText={onBpmChange}
+                    keyboardType="number-pad"
+                    editable={!running}
+                    maxLength={3}
+                  />
+                </View>
+                {phase === "exercising" ? (
+                  <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
+                    <Text style={styles.buttonText}>Stop</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.button, running ? styles.buttonStop : styles.buttonStart]}
+                    onPress={onStartStop}
+                  >
+                    <Text style={styles.buttonText}>
+                      {running ? "Stop" : "Start"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <View style={[styles.settingsBlock, styles.settingsCell]}>
+              <View style={styles.sliderRow}>
+                <Text style={styles.settingsLabel}>Visual</Text>
+                <TextInput
+                  style={styles.compensationInput}
+                  value={visualInputStr ?? String(visualCompensationMs)}
+                  onChangeText={setVisualInputStr}
+                  onFocus={() => setVisualInputStr(String(visualCompensationMs))}
+                  onBlur={() => visualInputStr !== null && commitVisual(visualInputStr)}
+                  onEndEditing={(e) => commitVisual(e.nativeEvent.text)}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                />
+                <Text style={styles.sliderUnit}>ms</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={COMPENSATION_MIN_MS}
+                  maximumValue={SLIDER_MAX_MS}
+                  step={5}
+                  value={Math.min(visualCompensationMs, SLIDER_MAX_MS)}
+                  onValueChange={onVisualCompensationChange}
+                  minimumTrackTintColor="#22c55e"
+                  maximumTrackTintColor="#333"
+                  thumbTintColor="#22c55e"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+        {showSummary && counts && (
+          <View style={[styles.summary, styles.settingsBlock]}>
+            <Text style={styles.summaryTitle}>Session summary</Text>
+            <View style={styles.summaryStatsRow}>
+              <View style={styles.summaryStat}>
+                <Text style={[styles.summaryLabel, styles.summaryPerfect]}>Perfect</Text>
+                <Text style={styles.summaryValue}>{counts.perfect}</Text>
+              </View>
+              <View style={styles.summaryStat}>
+                <Text style={[styles.summaryLabel, styles.summaryGood]}>Good</Text>
+                <Text style={styles.summaryValue}>{counts.good}</Text>
+              </View>
+              <View style={styles.summaryStat}>
+                <Text style={[styles.summaryLabel, styles.summaryMiss]}>Miss</Text>
+                <Text style={styles.summaryValue}>{counts.miss}</Text>
+              </View>
+            </View>
+          </View>
         )}
-        </View>
-        <View style={styles.sliderColumn}>
-          <View style={styles.sliderRow}>
-            <Text style={styles.sliderLabel}>Auditory</Text>
-            <TextInput
-              style={styles.compensationInput}
-              value={auditoryInputStr ?? String(auditoryCompensationMs)}
-              onChangeText={setAuditoryInputStr}
-              onFocus={() => setAuditoryInputStr(String(auditoryCompensationMs))}
-              onBlur={() => auditoryInputStr !== null && commitAuditory(auditoryInputStr)}
-              onEndEditing={(e) => commitAuditory(e.nativeEvent.text)}
-              keyboardType="number-pad"
-              maxLength={3}
-            />
-            <Text style={styles.sliderUnit}>ms</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={COMPENSATION_MIN_MS}
-              maximumValue={SLIDER_MAX_MS}
-              step={5}
-              value={Math.min(auditoryCompensationMs, SLIDER_MAX_MS)}
-              onValueChange={onAuditoryCompensationChange}
-              minimumTrackTintColor="#22c55e"
-              maximumTrackTintColor="#333"
-              thumbTintColor="#22c55e"
-            />
-          </View>
-          <View style={styles.sliderRow}>
-            <Text style={styles.sliderLabel}>Visual</Text>
-            <TextInput
-              style={styles.compensationInput}
-              value={visualInputStr ?? String(visualCompensationMs)}
-              onChangeText={setVisualInputStr}
-              onFocus={() => setVisualInputStr(String(visualCompensationMs))}
-              onBlur={() => visualInputStr !== null && commitVisual(visualInputStr)}
-              onEndEditing={(e) => commitVisual(e.nativeEvent.text)}
-              keyboardType="number-pad"
-              maxLength={3}
-            />
-            <Text style={styles.sliderUnit}>ms</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={COMPENSATION_MIN_MS}
-              maximumValue={SLIDER_MAX_MS}
-              step={5}
-              value={Math.min(visualCompensationMs, SLIDER_MAX_MS)}
-              onValueChange={onVisualCompensationChange}
-              minimumTrackTintColor="#22c55e"
-              maximumTrackTintColor="#333"
-              thumbTintColor="#22c55e"
-            />
-          </View>
-        </View>
       </View>
-
-      {showSummary && counts && (
-        <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>Session summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, styles.summaryPerfect]}>
-              Perfect
-            </Text>
-            <Text style={styles.summaryValue}>{counts.perfect}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, styles.summaryGood]}>Good</Text>
-            <Text style={styles.summaryValue}>{counts.good}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, styles.summaryMiss]}>Miss</Text>
-            <Text style={styles.summaryValue}>{counts.miss}</Text>
-          </View>
-          <TouchableOpacity style={styles.summaryButton} onPress={dismissSummary}>
-            <Text style={styles.summaryButtonText}>Practice again</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {phase === "idle" && (
         <Text style={styles.hint}>
@@ -425,6 +441,17 @@ const styles = StyleSheet.create({
     paddingTop: TAB_BAR_TOP_OFFSET + 24,
     backgroundColor: "#0f0f0f",
   },
+  titleBeatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 24,
+  },
+  titleBlock: {
+    flexShrink: 0,
+  },
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -434,7 +461,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: "#888",
-    marginBottom: 8,
+    marginBottom: 0,
   },
   warn: {
     color: "#f59e0b",
@@ -526,7 +553,7 @@ const styles = StyleSheet.create({
   beatRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginVertical: 24,
+    flexShrink: 0,
   },
   beatBox: {
     width: 56,
@@ -642,15 +669,33 @@ const styles = StyleSheet.create({
   },
   settingsRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 24,
     marginBottom: 24,
     flexWrap: "wrap",
   },
-  controlsColumn: {
+  /** Consistent width for metronome, delay sliders, and summary blocks. */
+  settingsBlock: {
+    width: 240,
+    minWidth: 240,
+  },
+  settingsGrid: {
     flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 16,
+    gap: 12,
+  },
+  settingsLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+  settingsCell: {
+    minHeight: 44,
+  },
+  settingsLabel: {
+    color: "#888",
+    fontSize: 12,
+    width: 52,
+    marginRight: 8,
   },
   controlsRow: {
     flexDirection: "row",
@@ -660,11 +705,6 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  label: {
-    color: "#888",
-    fontSize: 14,
-    marginRight: 12,
   },
   input: {
     marginRight: 12,
@@ -694,17 +734,11 @@ const styles = StyleSheet.create({
   sliderColumn: {
     flexDirection: "column",
     gap: 4,
-    minWidth: 180,
   },
   sliderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: "#888",
-    width: 52,
   },
   compensationInput: {
     fontSize: 12,
@@ -726,7 +760,6 @@ const styles = StyleSheet.create({
     height: 44,
   },
   summary: {
-    marginTop: 16,
     padding: 20,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
@@ -735,13 +768,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#fff",
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  summaryRow: {
+  summaryStatsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 16,
+    marginBottom: 12,
+  },
+  summaryStat: {
+    flex: 1,
+    flexDirection: "column",
     alignItems: "center",
-    paddingVertical: 8,
   },
   summaryLabel: {
     fontSize: 16,
@@ -753,18 +790,6 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 16,
     color: "#fff",
-  },
-  summaryButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#333",
-    borderRadius: 8,
-  },
-  summaryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
   hint: {
     fontSize: 14,
