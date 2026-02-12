@@ -92,6 +92,8 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
   const [visualCompensationMs, setVisualCompensationMs] = useState(LATENCY_COMPENSATION_MS);
   const auditoryCompensationMsRef = useRef(LATENCY_COMPENSATION_MS);
   const visualCompensationMsRef = useRef(LATENCY_COMPENSATION_MS);
+  const saveAuditoryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveVisualTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!user || progressLoaded) return;
@@ -481,22 +483,36 @@ export function usePractice(user: User | null, options?: UsePracticeOptions) {
 
   const counts = summaryResults ? countByAccuracy(summaryResults) : null;
 
+  const SAVE_COMPENSATION_DEBOUNCE_MS = 500;
+
   const onAuditoryCompensationChange = useCallback(
     (ms: number) => {
-      const clamped = Math.max(0, Math.min(80, Math.round(ms)));
+      const clamped = Math.max(0, Math.min(999, Math.round(ms)));
       auditoryCompensationMsRef.current = clamped;
       setAuditoryCompensationMs(clamped);
-      if (user) saveAuditoryCompensation(user, clamped);
+      if (user) {
+        if (saveAuditoryTimeoutRef.current) clearTimeout(saveAuditoryTimeoutRef.current);
+        saveAuditoryTimeoutRef.current = setTimeout(() => {
+          saveAuditoryTimeoutRef.current = null;
+          saveAuditoryCompensation(user, clamped);
+        }, SAVE_COMPENSATION_DEBOUNCE_MS);
+      }
     },
     [user]
   );
 
   const onVisualCompensationChange = useCallback(
     (ms: number) => {
-      const clamped = Math.max(0, Math.min(80, Math.round(ms)));
+      const clamped = Math.max(0, Math.min(999, Math.round(ms)));
       visualCompensationMsRef.current = clamped;
       setVisualCompensationMs(clamped);
-      if (user) saveVisualCompensation(user, clamped);
+      if (user) {
+        if (saveVisualTimeoutRef.current) clearTimeout(saveVisualTimeoutRef.current);
+        saveVisualTimeoutRef.current = setTimeout(() => {
+          saveVisualTimeoutRef.current = null;
+          saveVisualCompensation(user, clamped);
+        }, SAVE_COMPENSATION_DEBOUNCE_MS);
+      }
     },
     [user]
   );

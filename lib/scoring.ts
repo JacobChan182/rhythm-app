@@ -88,7 +88,7 @@ export const ASSIGNMENT_WINDOW_MS = 150;
  * @param tapTimes - Array of tap times in AudioContext seconds (same clock as expectedTimes).
  * @param expectedTimes - Array of expected hit times from the note scheduler.
  * @param thresholds - Optional. Perfect and good bands in ms; defaults to DEFAULT_THRESHOLDS.
- * @param auditoryCompensationMs - Optional. User's auditory delay compensation (0–80 ms); defaults to LATENCY_COMPENSATION_MS.
+ * @param auditoryCompensationMs - Optional. User's auditory delay compensation (0–999 ms); defaults to LATENCY_COMPENSATION_MS.
  * @returns One HitResult per expected note. Taps are matched to the closest expected within ASSIGNMENT_WINDOW_MS.
  */
 export function scoreSession(

@@ -16,6 +16,8 @@ type SlidingNoteLaneProps = {
   laneWidth?: number;
   /** Show "Perfect" / "Great" / "Miss" to the left of the hit zone for a moment after each hit or miss. */
   hitFeedback?: "perfect" | "good" | "miss" | null;
+  /** Visual latency compensation (ms). Offsets "now" so notes reach the hit zone earlier on screen. */
+  visualCompensationMs?: number;
 };
 
 type Note = { time: number; hand: "L" | "R" };
@@ -53,6 +55,7 @@ export function SlidingNoteLane({
   bpm,
   laneWidth: laneWidthProp,
   hitFeedback,
+  visualCompensationMs = 0,
 }: SlidingNoteLaneProps) {
   const notes = useMemo(() => buildNotes(expectedTimes, pattern), [expectedTimes, pattern]);
   const nowVal = useRef(new Animated.Value(0)).current;
@@ -60,6 +63,7 @@ export function SlidingNoteLane({
   const rafRef = useRef<number | null>(null);
   const visibilityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  const visualOffsetSec = visualCompensationMs / 1000;
   /** Throttled "now" used only to pick which notes to mount. Positions are driven by nowVal. */
   const [visibleWindowStart, setVisibleWindowStart] = useState(0);
   /** Measured width when no laneWidth prop; spans container (e.g. L–R button row). */
@@ -70,14 +74,16 @@ export function SlidingNoteLane({
   useEffect(() => {
     mountedRef.current = true;
     const t0 = getAudioContextTime();
-    nowRef.current = t0;
-    nowVal.setValue(t0);
-    setVisibleWindowStart(t0 - 1);
+    const displayNow = t0 + visualOffsetSec;
+    nowRef.current = displayNow;
+    nowVal.setValue(displayNow);
+    setVisibleWindowStart(displayNow - 1);
     const tick = () => {
       if (!mountedRef.current) return;
       const t = getAudioContextTime();
-      nowRef.current = t;
-      nowVal.setValue(t);
+      const displayNow = t + visualOffsetSec;
+      nowRef.current = displayNow;
+      nowVal.setValue(displayNow);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -85,7 +91,7 @@ export function SlidingNoteLane({
       mountedRef.current = false;
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [nowVal]);
+  }, [nowVal, visualOffsetSec]);
 
   useEffect(() => {
     const updateVisibility = () => {

@@ -42,7 +42,10 @@ type PracticeScreenProps = {
 };
 
 const COMPENSATION_MIN_MS = 0;
-const COMPENSATION_MAX_MS = 80;
+/** Slider thumb max; typing can go higher. */
+const SLIDER_MAX_MS = 200;
+/** Max value when typing in the input (slider is capped at SLIDER_MAX_MS). */
+const COMPENSATION_INPUT_MAX_MS = 999;
 
 export function PracticeScreen({
   phase,
@@ -75,6 +78,25 @@ export function PracticeScreen({
   onVisualCompensationChange,
 }: PracticeScreenProps) {
   const [soundPickerOpen, setSoundPickerOpen] = useState(false);
+  const [auditoryInputStr, setAuditoryInputStr] = useState<string | null>(null);
+  const [visualInputStr, setVisualInputStr] = useState<string | null>(null);
+
+  const commitAuditory = (raw: string) => {
+    const n = parseInt(raw, 10);
+    const clamped = Number.isNaN(n)
+      ? auditoryCompensationMs
+      : Math.max(COMPENSATION_MIN_MS, Math.min(COMPENSATION_INPUT_MAX_MS, n));
+    onAuditoryCompensationChange(clamped);
+    setAuditoryInputStr(null);
+  };
+  const commitVisual = (raw: string) => {
+    const n = parseInt(raw, 10);
+    const clamped = Number.isNaN(n)
+      ? visualCompensationMs
+      : Math.max(COMPENSATION_MIN_MS, Math.min(COMPENSATION_INPUT_MAX_MS, n));
+    onVisualCompensationChange(clamped);
+    setVisualInputStr(null);
+  };
   const nameFadeOpacity = useRef(new Animated.Value(1)).current;
   const prevPhaseRef = useRef<typeof phase>("idle");
   const showSummary = phase === "summary";
@@ -143,6 +165,7 @@ export function PracticeScreen({
                 pattern={rudiment.pattern}
                 bpm={bpm}
                 hitFeedback={hitFeedback}
+                visualCompensationMs={visualCompensationMs}
               />
             ) : (
               <View style={styles.trackPlaceholderWrapper}>
@@ -205,32 +228,35 @@ export function PracticeScreen({
       </View>
       <Text style={styles.tapCount}>{tapCount} taps</Text>
 
-      <View style={styles.controlsRow}>
-        <View style={styles.controls}>
-          <Text style={styles.label}>BPM</Text>
-          <TextInput
-            style={styles.input}
-            value={bpmInput}
-            onChangeText={onBpmChange}
-            keyboardType="number-pad"
-            editable={!running}
-            maxLength={3}
-          />
+      <View style={styles.settingsRow}>
+        <View style={styles.controlsColumn}>
+        <View style={styles.controlsRow}>
+          <View style={styles.controls}>
+            <Text style={styles.label}>BPM</Text>
+            <TextInput
+              style={styles.input}
+              value={bpmInput}
+              onChangeText={onBpmChange}
+              keyboardType="number-pad"
+              editable={!running}
+              maxLength={3}
+            />
+          </View>
+          {phase === "exercising" ? (
+            <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
+              <Text style={styles.buttonText}>Stop</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, running ? styles.buttonStop : styles.buttonStart]}
+              onPress={onStartStop}
+            >
+              <Text style={styles.buttonText}>
+                {running ? "Stop" : "Start"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {phase === "exercising" ? (
-          <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
-            <Text style={styles.buttonText}>Stop</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.button, running ? styles.buttonStop : styles.buttonStart]}
-            onPress={onStartStop}
-          >
-            <Text style={styles.buttonText}>
-              {running ? "Stop" : "Start"}
-            </Text>
-          </TouchableOpacity>
-        )}
         {isWeb && (
           <View style={styles.controls}>
             <Text style={styles.label}>Sound</Text>
@@ -304,16 +330,27 @@ export function PracticeScreen({
             )}
           </View>
         )}
+        </View>
         <View style={styles.sliderColumn}>
           <View style={styles.sliderRow}>
             <Text style={styles.sliderLabel}>Auditory</Text>
-            <Text style={styles.sliderValue}>{auditoryCompensationMs} ms</Text>
+            <TextInput
+              style={styles.compensationInput}
+              value={auditoryInputStr ?? String(auditoryCompensationMs)}
+              onChangeText={setAuditoryInputStr}
+              onFocus={() => setAuditoryInputStr(String(auditoryCompensationMs))}
+              onBlur={() => auditoryInputStr !== null && commitAuditory(auditoryInputStr)}
+              onEndEditing={(e) => commitAuditory(e.nativeEvent.text)}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <Text style={styles.sliderUnit}>ms</Text>
             <Slider
               style={styles.slider}
               minimumValue={COMPENSATION_MIN_MS}
-              maximumValue={COMPENSATION_MAX_MS}
+              maximumValue={SLIDER_MAX_MS}
               step={5}
-              value={auditoryCompensationMs}
+              value={Math.min(auditoryCompensationMs, SLIDER_MAX_MS)}
               onValueChange={onAuditoryCompensationChange}
               minimumTrackTintColor="#22c55e"
               maximumTrackTintColor="#333"
@@ -322,13 +359,23 @@ export function PracticeScreen({
           </View>
           <View style={styles.sliderRow}>
             <Text style={styles.sliderLabel}>Visual</Text>
-            <Text style={styles.sliderValue}>{visualCompensationMs} ms</Text>
+            <TextInput
+              style={styles.compensationInput}
+              value={visualInputStr ?? String(visualCompensationMs)}
+              onChangeText={setVisualInputStr}
+              onFocus={() => setVisualInputStr(String(visualCompensationMs))}
+              onBlur={() => visualInputStr !== null && commitVisual(visualInputStr)}
+              onEndEditing={(e) => commitVisual(e.nativeEvent.text)}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <Text style={styles.sliderUnit}>ms</Text>
             <Slider
               style={styles.slider}
               minimumValue={COMPENSATION_MIN_MS}
-              maximumValue={COMPENSATION_MAX_MS}
+              maximumValue={SLIDER_MAX_MS}
               step={5}
-              value={visualCompensationMs}
+              value={Math.min(visualCompensationMs, SLIDER_MAX_MS)}
               onValueChange={onVisualCompensationChange}
               minimumTrackTintColor="#22c55e"
               maximumTrackTintColor="#333"
@@ -593,12 +640,22 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "600",
   },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 24,
+    marginBottom: 24,
+    flexWrap: "wrap",
+  },
+  controlsColumn: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 16,
+  },
   controlsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
     gap: 16,
-    marginBottom: 24,
   },
   controls: {
     flexDirection: "row",
@@ -649,14 +706,24 @@ const styles = StyleSheet.create({
     color: "#888",
     width: 52,
   },
-  sliderValue: {
+  compensationInput: {
     fontSize: 12,
     color: "#fff",
-    width: 36,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    width: 44,
+    textAlign: "center",
+  },
+  sliderUnit: {
+    fontSize: 12,
+    color: "#888",
+    width: 20,
   },
   slider: {
     width: 100,
-    height: 32,
+    height: 44,
   },
   summary: {
     marginTop: 16,

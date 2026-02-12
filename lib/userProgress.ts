@@ -27,7 +27,7 @@ const DEFAULT_BPM = 120;
 export const RECOMMENDED_AUDITORY_MS = 15;
 export const RECOMMENDED_VISUAL_MS = 15;
 const MIN_COMPENSATION_MS = 0;
-const MAX_COMPENSATION_MS = 80;
+const MAX_COMPENSATION_MS = 999;
 
 /** Normalize for case-insensitive uniqueness (e.g. "CoolUser" and "cooluser" are the same). */
 export function normalizeUsername(s: string): string {
