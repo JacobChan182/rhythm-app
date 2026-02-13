@@ -240,23 +240,25 @@ export function PracticeScreen({
           <View style={styles.settingsLine}>
             <View style={[styles.settingsBlock, styles.settingsCell]}>
             {isWeb ? (
-              <View style={styles.controls}>
+              <View style={[styles.controls, styles.soundRowFullWidth]}>
                 <Text style={styles.settingsLabel}>Sound</Text>
             {Platform.OS === "web" ? (
-              <select
-                value={sound}
-                onChange={(e) =>
-                  onSoundChange((e.target as HTMLSelectElement).value as MetronomeSoundId)
-                }
-                style={styles.soundSelect as unknown as React.CSSProperties}
-                disabled={running}
-              >
+              <View style={styles.soundSelectWrapper}>
+                <select
+                  value={sound}
+                  onChange={(e) =>
+                    onSoundChange((e.target as HTMLSelectElement).value as MetronomeSoundId)
+                  }
+                  style={styles.soundSelect as unknown as React.CSSProperties}
+                  disabled={running}
+                >
                 {METRONOME_SOUND_PRESETS.map((preset) => (
                   <option key={preset.id} value={preset.id}>
                     {preset.label}
                   </option>
                 ))}
-              </select>
+                </select>
+              </View>
             ) : (
               <>
                 <TouchableOpacity
@@ -359,7 +361,7 @@ export function PracticeScreen({
                   />
                 </View>
                 {phase === "exercising" ? (
-                  <TouchableOpacity style={styles.buttonStop} onPress={onStopForSummary}>
+                  <TouchableOpacity style={[styles.button, styles.buttonStop]} onPress={onStopForSummary}>
                     <Text style={styles.buttonText}>Stop</Text>
                   </TouchableOpacity>
                 ) : (
@@ -608,26 +610,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  soundRowFullWidth: {
+    flex: 1,
+    minWidth: 0,
+  },
+  soundSelectWrapper: {
+    flex: 1,
+    minWidth: 0,
+  },
   soundSelect: {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
     fontSize: 16,
     color: "#fff",
     backgroundColor: "#1a1a1a",
     padding: 12,
+    height: 44,
     borderRadius: 8,
-    minWidth: 160,
-    maxWidth: 220,
+    width: "100%",
     borderWidth: 0,
     cursor: "pointer",
-    marginRight: 12,
   },
   soundTouchable: {
     backgroundColor: "#1a1a1a",
     padding: 12,
+    height: 44,
     borderRadius: 8,
     minWidth: 160,
     maxWidth: 220,
     marginRight: 12,
+    justifyContent: "center",
   },
   soundTouchableText: {
     fontSize: 16,
@@ -669,7 +680,7 @@ const styles = StyleSheet.create({
   },
   settingsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
     gap: 24,
     marginBottom: 24,
     flexWrap: "wrap",
@@ -711,14 +722,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a1a",
     borderRadius: 8,
     padding: 12,
+    height: 44,
     width: 72,
     fontSize: 18,
     color: "#fff",
   },
   button: {
-    paddingVertical: 12,
+    height: 44,
+    minWidth: 72,
+    paddingVertical: 0,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   buttonStart: {
     backgroundColor: "#22c55e",
@@ -762,7 +778,8 @@ const styles = StyleSheet.create({
   summary: {
     padding: 20,
     backgroundColor: "#1a1a1a",
-    borderRadius: 12,
+    borderRadius: 8,
+    justifyContent: "space-between",
   },
   summaryTitle: {
     fontSize: 18,
