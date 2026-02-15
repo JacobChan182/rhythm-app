@@ -20,16 +20,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    setAuthPersistence(auth).catch(() => {});
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const auth = getFirebaseAuth();
+      setAuthPersistence(auth).catch(() => {});
+      unsubscribe = onAuthStateChanged(auth, (u) => {
+        setUser(u);
+        setLoading(false);
+        setAuthError(null);
+        if (u) setAuthCookie();
+        else clearAuthCookie();
+      });
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Failed to load auth");
       setLoading(false);
-      setAuthError(null);
-      if (u) setAuthCookie();
-      else clearAuthCookie();
-    });
-    return unsubscribe;
+    }
+    return () => unsubscribe?.();
   }, []);
 
   const signInAsGuest = useCallback(async () => {

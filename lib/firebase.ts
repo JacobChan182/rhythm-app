@@ -29,7 +29,7 @@ export function getFirebase(): FirebaseApp {
   if (!app) {
     if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
       throw new Error(
-        "Missing Firebase config. Add EXPO_PUBLIC_FIREBASE_* to .env (see .env.example). Do not commit .env."
+        "Missing Firebase config. In the project root: copy .env.example to .env, fill in every EXPO_PUBLIC_FIREBASE_* value (from Firebase Console → Project settings → Your apps), then restart the dev server. Do not commit .env."
       );
     }
     app =

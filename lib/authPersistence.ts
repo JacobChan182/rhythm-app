@@ -1,5 +1,9 @@
 import { getFirebaseAuth } from "@/lib/firebase";
-import type { Auth } from "firebase/auth";
+import {
+  type Auth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 
 const COOKIE_NAME = "rhythm_session";
 const COOKIE_MAX_AGE_DAYS = 30;
@@ -11,7 +15,6 @@ const COOKIE_MAX_AGE_DAYS = 30;
 export async function setAuthPersistence(auth: Auth): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    const { setPersistence, browserLocalPersistence } = await import("firebase/auth");
     await setPersistence(auth, browserLocalPersistence);
   } catch {
     // Not available (e.g. non-web); ignore
