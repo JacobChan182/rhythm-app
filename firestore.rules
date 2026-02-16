@@ -32,12 +32,6 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
       }
     }
-    match /lessons/{lessonId} {
-      allow read: if true;
-      allow create, update, delete: if request.auth != null
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
-    }
     // Admins: only listed admins can read (to check own role); write via Console or backend only
     match /admins/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;

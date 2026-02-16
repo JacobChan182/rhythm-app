@@ -9,26 +9,22 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { TAB_BAR_TOP_OFFSET } from "@/constants/layout";
-import { getCourses, getLessonsByCourseId } from "@/lib/curriculum";
-import { getRudimentById } from "@/lib/rudiments";
-import { parseCourseRudimentId } from "@/lib/courseRudiments";
-import type { Course, Lesson } from "@/types/curriculum";
-
-function rudimentDisplayName(rudimentId: string): string {
-  const staticR = getRudimentById(rudimentId);
-  if (staticR) return staticR.name;
-  if (parseCourseRudimentId(rudimentId)) return "Course rudiment";
-  return rudimentId;
-}
+import {
+  getRudimentsByCourseId,
+  type CourseRudimentSummary,
+} from "@/lib/courseRudiments";
+import { getCourses } from "@/lib/curriculum";
+import type { Course } from "@/types/curriculum";
 
 export default function Learn() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
-  const [lessonsByCourse, setLessonsByCourse] = useState<Record<string, Lesson[]>>({});
-  const [lessonsLoading, setLessonsLoading] = useState<Record<string, boolean>>({});
-  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [rudimentsByCourse, setRudimentsByCourse] = useState<
+    Record<string, CourseRudimentSummary[]>
+  >({});
+  const [rudimentsLoading, setRudimentsLoading] = useState<Record<string, boolean>>({});
 
   const loadCourses = useCallback(async () => {
     setLoading(true);
@@ -50,25 +46,19 @@ export default function Learn() {
   async function toggleCourse(courseId: string) {
     if (expandedCourseId === courseId) {
       setExpandedCourseId(null);
-      setSelectedLesson(null);
       return;
     }
     setExpandedCourseId(courseId);
-    setSelectedLesson(null);
-    if (lessonsByCourse[courseId]) return;
-    setLessonsLoading((prev) => ({ ...prev, [courseId]: true }));
+    if (rudimentsByCourse[courseId]) return;
+    setRudimentsLoading((prev) => ({ ...prev, [courseId]: true }));
     try {
-      const lessons = await getLessonsByCourseId(courseId);
-      setLessonsByCourse((prev) => ({ ...prev, [courseId]: lessons }));
+      const rudiments = await getRudimentsByCourseId(courseId);
+      setRudimentsByCourse((prev) => ({ ...prev, [courseId]: rudiments }));
     } catch {
-      setLessonsByCourse((prev) => ({ ...prev, [courseId]: [] }));
+      setRudimentsByCourse((prev) => ({ ...prev, [courseId]: [] }));
     } finally {
-      setLessonsLoading((prev) => ({ ...prev, [courseId]: false }));
+      setRudimentsLoading((prev) => ({ ...prev, [courseId]: false }));
     }
-  }
-
-  function openLesson(lesson: Lesson) {
-    setSelectedLesson(lesson);
   }
 
   function goToPractice(rudimentId: string, suggestedBpm?: number) {
@@ -98,40 +88,10 @@ export default function Learn() {
     );
   }
 
-  if (selectedLesson) {
-    return (
-      <View style={styles.container}>
-        <TouchableOpacity style={styles.backRow} onPress={() => setSelectedLesson(null)}>
-          <Text style={styles.backText}>← Back to lessons</Text>
-        </TouchableOpacity>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.lessonTitle}>{selectedLesson.title}</Text>
-          <Text style={styles.lessonBody}>{selectedLesson.body}</Text>
-          {selectedLesson.rudimentIds.length > 0 ? (
-            <View style={styles.rudimentsSection}>
-              <Text style={styles.rudimentsHeading}>Rudiments in this lesson</Text>
-              {selectedLesson.rudimentIds.map((rid) => (
-                <TouchableOpacity
-                  key={rid}
-                  style={[styles.practiceButton, styles.practiceButtonSpaced]}
-                  onPress={() => goToPractice(rid, selectedLesson.suggestedBpm)}
-                >
-                  <Text style={styles.practiceButtonText}>
-                    Practice {rudimentDisplayName(rid)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-        </ScrollView>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Learn</Text>
-      <Text style={styles.subtitle}>Choose a course to view lessons.</Text>
+      <Text style={styles.subtitle}>Choose a course to view rudiments.</Text>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {courses.length === 0 ? (
           <Text style={styles.emptyText}>No courses yet. Add some in the curriculum builder.</Text>
@@ -150,30 +110,26 @@ export default function Learn() {
                   </Text>
                 </TouchableOpacity>
                 {expandedCourseId === course.id && (
-                  <View style={styles.lessonsContainer}>
-                    {lessonsLoading[course.id] ? (
-                      <ActivityIndicator size="small" color="#22c55e" style={styles.lessonLoader} />
+                  <View style={styles.rudimentsContainer}>
+                    {rudimentsLoading[course.id] ? (
+                      <ActivityIndicator size="small" color="#22c55e" style={styles.rudimentLoader} />
                     ) : (
-                      (lessonsByCourse[course.id] ?? []).map((lesson) => (
+                      (rudimentsByCourse[course.id] ?? []).map((rudiment) => (
                         <TouchableOpacity
-                          key={lesson.id}
-                          style={styles.lessonRow}
-                          onPress={() => openLesson(lesson)}
+                          key={rudiment.id}
+                          style={styles.rudimentRow}
+                          onPress={() => goToPractice(rudiment.id)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.lessonRowTitle}>{lesson.title}</Text>
-                          {lesson.rudimentIds.length > 0 ? (
-                            <Text style={styles.lessonBadge}>
-                              {lesson.rudimentIds.length} rudiment{lesson.rudimentIds.length !== 1 ? "s" : ""}
-                            </Text>
-                          ) : null}
+                          <Text style={styles.rudimentRowTitle}>{rudiment.name}</Text>
+                          <Text style={styles.rudimentBadge}>Practice</Text>
                         </TouchableOpacity>
                       ))
                     )}
                     {expandedCourseId === course.id &&
-                      !lessonsLoading[course.id] &&
-                      (lessonsByCourse[course.id] ?? []).length === 0 && (
-                        <Text style={styles.emptyLessons}>No lessons in this course.</Text>
+                      !rudimentsLoading[course.id] &&
+                      (rudimentsByCourse[course.id] ?? []).length === 0 && (
+                        <Text style={styles.emptyRudiments}>No rudiments in this course.</Text>
                       )}
                   </View>
                 )}
@@ -274,14 +230,14 @@ const styles = StyleSheet.create({
     color: "#71717a",
     fontSize: 12,
   },
-  lessonsContainer: {
+  rudimentsContainer: {
     paddingHorizontal: 18,
     paddingBottom: 16,
   },
-  lessonLoader: {
+  rudimentLoader: {
     marginVertical: 12,
   },
-  lessonRow: {
+  rudimentRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
@@ -290,62 +246,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
-  lessonRowTitle: {
+  rudimentRowTitle: {
     fontSize: 15,
     color: "#e4e4e7",
     flex: 1,
   },
-  lessonBadge: {
+  rudimentBadge: {
     fontSize: 12,
     color: "#22c55e",
     fontWeight: "500",
   },
-  emptyLessons: {
+  emptyRudiments: {
     color: "#71717a",
     fontSize: 14,
     marginTop: 12,
-  },
-  backRow: {
-    marginBottom: 16,
-  },
-  backText: {
-    color: "#22c55e",
-    fontSize: 15,
-  },
-  lessonTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 12,
-  },
-  lessonBody: {
-    fontSize: 16,
-    color: "#d4d4d8",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  practiceButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: "#22c55e",
-    borderRadius: 8,
-  },
-  practiceButtonSpaced: {
-    marginBottom: 10,
-  },
-  practiceButtonText: {
-    color: "#000",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  rudimentsSection: {
-    marginTop: 8,
-  },
-  rudimentsHeading: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#a1a1aa",
-    marginBottom: 12,
   },
 });

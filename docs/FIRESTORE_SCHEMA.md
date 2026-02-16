@@ -68,13 +68,7 @@
 
 - **Path:** `courses/{courseId}/rudiments/{rudimentId}` (auto-ID)
 - **Fields:** `name` (string), `pattern` (array of 32 strings: `"L"` | `"R"` | `""` for rest, each cell = one 16th note), `order` (number), `updatedAt` (ISO string).
-- Admins add/edit these in the curriculum builder (32-box editor: left click = L, right click = R, click again = rest). Lessons can reference them via id `course:{courseId}:{rudimentId}`.
-
-### `lessons` (one doc per lesson in a course)
-
-- **Path:** `lessons/{lessonId}` (auto-ID)
-- **Fields:** `courseId` (string), `title` (string), `body` (string, markdown or plain), `order` (number), `rudimentIds` (array of strings — rudiment IDs for the student to learn, e.g. `["paradiddle-1"]`), `suggestedBpm` (optional number), `updatedAt` (ISO string).
-- Written by the curriculum-builder app; read by the rhythm app Learn tab. Legacy: if `rudimentIds` is missing, readers fall back to single `rudimentId` when present.
+- Admins add/edit these in the curriculum builder (32-box editor: left click = L, right click = R, click again = rest). The rhythm app references them by id `course:{courseId}:{rudimentId}`.
 
 ### `admins` (optional – for curriculum write access)
 
@@ -85,11 +79,7 @@
 ## Example queries (curriculum)
 
 - **List courses by order:** `collection('courses').orderBy('order').get()` → implemented in lib/curriculum.ts `getCourses()`.
-- **List lessons for a course:** `collection('lessons').where('courseId', '==', courseId).orderBy('order').get()` → `getLessonsByCourseId(courseId)`.
-
-**Note:** A composite index on `lessons` (courseId, order) is required for listing lessons by course. Either:
-- **Console:** When the query first runs, Firestore logs a link to create the index; open it and click Create.
-- **CLI:** From `rhythm-app`, run `firebase deploy --only firestore:indexes` (index is defined in `firestore.indexes.json`).
+- **List rudiments in a course:** `collection('courses', courseId, 'rudiments').orderBy('order').get()` → `getRudimentsByCourseId(courseId)` in lib/courseRudiments.ts.
 
 ## Security rules (required for collections to work)
 
@@ -122,6 +112,6 @@ Use the rules in the project root: **`firestore.rules`**.
    `firebase use crash-course-19cb4` then `firebase deploy --only firestore:rules`.  
    Or paste the contents of `firestore.rules` into Console → Firestore → Rules and click **Publish**.  
 2. **Same project** – Rhythm app `.env` and curriculum-builder `.env` must use the same Firebase project as the Console (e.g. `crash-course-19cb4`).  
-3. **Rhythm app – Learn tab** – Courses/lessons/rudiments are readable by anyone (`allow read: if true`). If you still see permission denied there, rules are not deployed or the app is using a different project.  
+3. **Rhythm app – Learn tab** – Courses and course rudiments are readable by anyone (`allow read: if true`). If you still see permission denied there, rules are not deployed or the app is using a different project.  
 4. **Rhythm app – Home / Progress** – Reading `users` or `sessions` requires the user to be **signed in**. Sign in (or sign up) and try again.  
 5. **Curriculum builder** – You must be **signed in**; the app reads `admins/{yourUid}` to check admin. Add your UID to `admins` with `role: "admin"` in the Console if you need write access.

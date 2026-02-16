@@ -1,10 +1,44 @@
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+} from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
 import type { Rudiment } from "@/types/rudiment";
 
 const COURSES = "courses";
 const RUDIMENTS = "rudiments";
 const PATTERN_LENGTH = 32;
+
+export interface CourseRudimentSummary {
+  id: string;
+  name: string;
+  order: number;
+}
+
+/**
+ * List rudiments in a course (from subcollection), ordered by order.
+ * id is the full course rudiment id: course:{courseId}:{rudimentId}.
+ */
+export async function getRudimentsByCourseId(
+  courseId: string
+): Promise<CourseRudimentSummary[]> {
+  const db = getFirebaseDb();
+  const ref = collection(db, COURSES, courseId, RUDIMENTS);
+  const q = query(ref, orderBy("order"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: `course:${courseId}:${d.id}`,
+      name: typeof data.name === "string" ? data.name : "Rudiment",
+      order: typeof data.order === "number" ? data.order : 0,
+    };
+  });
+}
 
 /**
  * Parse course rudiment id "course:{courseId}:{rudimentId}".
