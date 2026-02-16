@@ -1,8 +1,9 @@
 /**
  * Subdivision of the beat the rudiment is written in.
  * Affects how the pattern aligns to the metronome (e.g. eighth = 2 strokes per click at quarter-note pulse).
+ * eighthTriplet = 3 notes per beat (eighth-note triplets).
  */
-export type Subdivision = "quarter" | "eighth" | "sixteenth";
+export type Subdivision = "quarter" | "eighth" | "sixteenth" | "eighthTriplet";
 
 /**
  * Single hand stroke in a pattern.

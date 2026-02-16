@@ -67,7 +67,8 @@
 ### `courses/{courseId}/rudiments` (rudiments defined per course)
 
 - **Path:** `courses/{courseId}/rudiments/{rudimentId}` (auto-ID)
-- **Fields:** `name` (string), `pattern` (array of 32 strings: `"L"` | `"R"` | `""` for rest, each cell = one 16th note), `order` (number), `updatedAt` (ISO string).
+- **Fields:** `name` (string), `pattern` (array of 32 or 24 strings: `"L"` | `"R"` | `""` for rest), `subdivision` (string: `"sixteenth"` or `"eighthTriplet"`), `order` (number), `updatedAt` (ISO string).
+- **Subdivision:** `"sixteenth"` = 32 cells = 32 sixteenth notes; `"eighthTriplet"` = 24 cells = 24 eighth-note triplets (2 bars).
 - Admins add/edit these in the curriculum builder (32-box editor: left click = L, right click = R, click again = rest). The rhythm app references them by id `course:{courseId}:{rudimentId}`.
 
 ### `admins` (optional – for curriculum write access)

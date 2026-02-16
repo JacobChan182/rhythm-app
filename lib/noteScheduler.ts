@@ -2,12 +2,13 @@ import type { Subdivision } from "@/types/rudiment";
 
 /**
  * Notes per beat for each subdivision (in 4/4: one beat = one quarter note).
- * Quarter = 1 hit per beat, eighth = 2, sixteenth = 4.
+ * Quarter = 1, eighth = 2, sixteenth = 4, eighthTriplet = 3.
  */
 const NOTES_PER_BEAT: Record<Subdivision, number> = {
   quarter: 1,
   eighth: 2,
   sixteenth: 4,
+  eighthTriplet: 3,
 };
 
 /**

@@ -11,7 +11,8 @@ import type { Rudiment } from "@/types/rudiment";
 
 const COURSES = "courses";
 const RUDIMENTS = "rudiments";
-const PATTERN_LENGTH = 32;
+const PATTERN_LENGTH_SIXTEENTH = 32;
+const PATTERN_LENGTH_TRIPLET = 24;
 
 export interface CourseRudimentSummary {
   id: string;
@@ -71,15 +72,17 @@ export async function getCourseRudiment(
   if (!snap.exists()) return null;
   const data = snap.data();
   const raw = Array.isArray(data.pattern) ? data.pattern : [];
+  const subdivision = data.subdivision === "eighthTriplet" ? "eighthTriplet" : "sixteenth";
+  const patternLength = subdivision === "eighthTriplet" ? PATTERN_LENGTH_TRIPLET : PATTERN_LENGTH_SIXTEENTH;
   const pattern: ("" | "L" | "R")[] = [];
-  for (let i = 0; i < PATTERN_LENGTH; i++) {
+  for (let i = 0; i < patternLength; i++) {
     pattern.push(normalizeCell(raw[i]));
   }
   return {
     id: `course:${courseId}:${rudimentId}`,
     name: typeof data.name === "string" ? data.name : "Rudiment",
     bpm: 80,
-    subdivision: "sixteenth",
+    subdivision,
     pattern,
   };
 }
