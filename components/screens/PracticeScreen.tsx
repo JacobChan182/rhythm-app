@@ -119,6 +119,23 @@ export function PracticeScreen({
     }
   }, [phase, nameFadeOpacity]);
 
+  // F = L, J = R keyboard shortcuts (web)
+  useEffect(() => {
+    if (!isWeb || typeof window === "undefined") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === "f") {
+        e.preventDefault();
+        onTapLeft();
+      } else if (key === "j") {
+        e.preventDefault();
+        onTapRight();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isWeb, onTapLeft, onTapRight]);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleBeatRow}>
@@ -208,7 +225,7 @@ export function PracticeScreen({
           activeOpacity={1}
         >
           <Text style={styles.tapLabel}>L</Text>
-          <Text style={styles.tapSubtext}>Left</Text>
+          <Text style={styles.tapSubtext}>Left {isWeb ? "(F)" : ""}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -229,7 +246,7 @@ export function PracticeScreen({
           activeOpacity={1}
         >
           <Text style={styles.tapLabel}>R</Text>
-          <Text style={styles.tapSubtext}>Right</Text>
+          <Text style={styles.tapSubtext}>Right {isWeb ? "(J)" : ""}</Text>
         </TouchableOpacity>
       </View>
       <Text style={styles.tapCount}>{tapCount} taps</Text>
